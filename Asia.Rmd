@@ -1,7 +1,7 @@
 USCIS data on status adjustment from non-immigrant visa status to US permanent residency
 ========================================================
 Analysis - Time to status adjustment, by visa types stratified by WHO TB region, geographical region and country of birth
-By:       Sasi R Jonnalagadda  
+By:       Sasi R Jonnalagadda, PhD  
 Date:     `r date()`
 
 #This report is for Asian countries
