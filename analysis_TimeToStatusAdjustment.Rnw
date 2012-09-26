@@ -1,0 +1,886 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE)
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+@
+
+\title{Applicants for Status Adjustment in the US\\
+Time to Status Adjustment, by country of birth, geographical region and TB burden\\
+USCIS Data}
+\maketitle
+
+\tableofcontents           
+\listoftables
+\listoffigures
+
+\newpage
+<<'Load data'>>=
+load("C:/Users/wau4/Desktop/uscis/uscis/ni.main.Rda")
+ni.main <- ni.main[sample(1:nrow(ni.main), 5000, replace=FALSE),]
+@
+
+\section{Introduction}
+
+In this section, we will focus on the issue of time to status adjustment.  As discussed in the introduction, the duration of importance is the time spent in the US before taking civil surgeon exam.  However, since the date of the examination is unavailable, the date of status adjustment application is being used as a proxy measure.  Duration is therefore the time between last entry into the US and the date of application for status adjustment.  
+
+\subsection{Countries stratified by WHO TB burden}
+
+\subsubsection{Countries with high TB incidence ($>$100/100,000)}
+<<'High TB burden countries'>>=
+hightb <- subset(ni.main, tbburden=="high (TB incidence>100/100,000)", drop=TRUE) 
+hightb$tbburden <- factor(hightb$tbburden)
+hightb$COB <- factor(hightb$COB)
+#Display frequency of status adjusters from countries with high TB incidence rate (>100/100,000)
+df <- ddply(hightb, .(COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(COB="Country of birth", count="Number"))
+@
+
+<<'Countries with high tb incidence-table'>>=
+print(xtable(df, caption="Status adjustment applicants from countries with high TB incidence"), include.rownames=FALSE)
+@
+
+\subsubsection{Countries with medium TB incidence (20-100/100,000)}
+<<'Medium TB burden countries'>>=
+mediumtb <- subset(ni.main, tbburden=="medium (TB incidence 20-100/100,000)", drop=TRUE) 
+mediumtb$tbburden <- factor(mediumtb$tbburden)
+mediumtb$COB <- factor(mediumtb$COB)
+#Display frequency of status adjusters from countries with medium TB incidence rate (20-100/100,000)
+df <- ddply(mediumtb, .(COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(COB="Country of birth", count="Number"))
+@
+
+<<'Countries with medium tb incidence-table'>>=
+print(xtable(df, caption="Status adjustment applicants from countries with medium TB incidence"), include.rownames=FALSE)
+@
+
+\subsubsection{Countries with low TB incidence ($<$20/100,000)}
+
+<<'Low TB burden countries'>>=
+lowtb <- subset(ni.main, tbburden=="low (TB incidence<20/100,000)", drop=TRUE) 
+lowtb$tbburden <- factor(lowtb$tbburden)
+lowtb$COB <- factor(lowtb$COB)
+#Display frequency of status adjusters from countries with low TB incidence rate (<20/100,000)
+df <- ddply(lowtb, .(COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(COB="Country of birth", count="Number"))
+@
+
+<<'Countries with low tb incidence-table'>>=
+print(xtable(df, caption="Status adjustment applicants from countries with low TB incidence"), include.rownames=FALSE)
+@
+
+%Defining geographical region for countries, by WHO TB burden
+
+%Countries in Asia by WHO TB burden
+
+<<'Countries by WHO TB-Asia'>>=
+#Asia
+asiahightb <- subset(hightb, region=="Asia", drop=TRUE) 
+asiahightb$region <- factor(asiahightb$region)
+asiahightb$COB <- factor(asiahightb$COB)
+
+asiamedtb <- subset(mediumtb, region=="Asia", drop=TRUE)
+asiamedtb$region <- factor(asiamedtb$region)
+asiamedtb$COB <- factor(asiamedtb$COB)
+
+asialowtb <- subset(lowtb, region=="Asia", drop=TRUE)
+asialowtb$region <- factor(asialowtb$region)
+asialowtb$COB <- factor(asialowtb$COB)
+@
+
+
+<<'Asian countries-summary',eval=FALSE>>=
+asia <- subset(ni.main, region=="Asia", drop=TRUE) 
+asia$region <- factor(asia$region)
+asia$COB <- factor(asia$COB)
+
+df <- ddply(asia, .(tbburden, COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(count="Number", tbburden="WHO TB incidence", COB="Country of birth"))
+@
+
+<<'Asian countries by TB burden-table',eval=FALSE>>=
+print(xtable(df, caption="Status adjustment applicants from Asian countries, by WHO TB incidence"), include.rownames=FALSE)
+@
+
+%Countries in Europe by WHO TB burden
+
+<<'Countries by WHO TB-Europe'>>=
+#Europe
+eurohightb <- subset(hightb, region=="Europe", drop=TRUE) 
+eurohightb$region <- factor(eurohightb$region)
+eurohightb$COB <- factor(eurohightb$COB)
+
+euromedtb <- subset(mediumtb, region=="Europe", drop=TRUE)
+euromedtb$region <- factor(euromedtb$region)
+euromedtb$COB <- factor(euromedtb$COB)
+
+eurolowtb <- subset(lowtb, region=="Europe", drop=TRUE)
+eurolowtb$region <- factor(eurolowtb$region)
+eurolowtb$COB <- factor(eurolowtb$COB)
+@
+
+<<'European countries-summary',eval=FALSE>>=
+europe <- subset(ni.main, region=="Europe", drop=TRUE) 
+europe$region <- factor(europe$region)
+europe$COB <- factor(europe$COB)
+
+df <- ddply(europe, .(tbburden, COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(count="Number", tbburden="WHO TB incidence", COB="Country of birth"))
+@
+
+<<'European countries by TB burden-table',eval=FALSE>>=
+print(xtable(df, caption="Status adjustment applicants from European countries, by WHO TB incidence"), include.rownames=FALSE)
+@
+
+%Countries in Africa by WHO TB burden
+<<'Countries by WHO TB-Africa'>>=
+afrohightb <- subset(hightb, region=="Africa", drop=TRUE) 
+afrohightb$region <- factor(afrohightb$region)
+afrohightb$COB <- factor(afrohightb$COB)
+
+afromedtb <- subset(mediumtb, region=="Africa", drop=TRUE)
+afromedtb$region <- factor(afromedtb$region)
+afromedtb$COB <- factor(afromedtb$COB)
+
+afrolowtb <- subset(lowtb, region=="Africa", drop=TRUE)
+afrolowtb$region <- factor(afrolowtb$region)
+afrolowtb$COB <- factor(afrolowtb$COB)
+@
+
+<<'African countries-summary',eval=FALSE>>=
+africa <- subset(ni.main, region=="Africa", drop=TRUE) 
+africa$region <- factor(africa$region)
+africa$COB <- factor(africa$COB)
+
+df <- ddply(africa, .(tbburden, COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(count="Number", tbburden="WHO TB incidence", COB="Country of birth"))
+@
+
+<<'African countries by TB burden-table',eval=FALSE>>=
+print(xtable(df, caption="Status adjustment applicants from African countries, by WHO TB incidence"), include.rownames=FALSE)
+@
+
+%Countries in North, Central and South America by WHO TB burden
+
+<<'Countries by WHO TB-Americas'>>=
+amhightb <- subset(hightb, region=="Americas", drop=TRUE) 
+amhightb$region <- factor(amhightb$region)
+amhightb$COB <- factor(amhightb$COB)
+
+ammedtb <- subset(mediumtb, region=="Americas", drop=TRUE)
+ammedtb$region <- factor(ammedtb$region)
+ammedtb$COB <- factor(ammedtb$COB)
+
+amlowtb <- subset(lowtb, region=="Americas", drop=TRUE)
+amlowtb$region <- factor(amlowtb$region)
+amlowtb$COB <- factor(amlowtb$COB)
+@
+
+<<'N, C and South American countries-summary',eval=FALSE>>=
+americas <- subset(ni.main, region=="Americas", drop=TRUE) 
+americas$region <- factor(americas$region)
+americas$COB <- factor(americas$COB)
+
+df <- ddply(americas, .(tbburden, COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(count="Number", tbburden="WHO TB incidence", COB="Country of birth"))
+@
+
+<<'N, C and South countries by TB burden-table',eval=FALSE>>=
+print(xtable(df, caption="Status adjustment applicants from countries in North, Central and South America, by WHO TB incidence"), include.rownames=FALSE)
+@
+
+%Countries in the Carribean by WHO TB burden
+
+<<'Countries by WHO TB-Carribean'>>=
+carrhightb <- subset(hightb, region=="Carribean", drop=TRUE) 
+carrhightb$region <- factor(carrhightb$region)
+carrhightb$COB <- factor(carrhightb$COB)
+
+carrmedtb <- subset(mediumtb, region=="Carribean", drop=TRUE)
+carrmedtb$region <- factor(carrmedtb$region)
+carrmedtb$COB <- factor(carrmedtb$COB)
+
+carrlowtb <- subset(lowtb, region=="Carribean", drop=TRUE)
+carrlowtb$region <- factor(carrlowtb$region)
+carrlowtb$COB <- factor(carrlowtb$COB)
+@
+
+<<'countries in the carribean-summary',eval=FALSE>>=
+carribean <- subset(ni.main, region=="Carribean", drop=TRUE) 
+carribean$region <- factor(carribean$region)
+carribean$COB <- factor(carribean$COB)
+
+df <- ddply(carribean, .(tbburden, COB), function(x) c(count=nrow(x)))
+df <- rename(df, c(count="Number", tbburden="WHO TB incidence", COB="Country of birth"))
+@
+
+<<'countries in the carribean by TB burden-table',eval=FALSE>>=
+print(xtable(df, caption="Status adjustment applicants from countries in the Carribean, by WHO TB incidence"), include.rownames=FALSE)
+@
+
+
+<<'full table'>>=
+require(plyr)
+df <- ddply(ni.main, .(region, COB, tbburden), function(x) c(count=nrow(x)))
+
+df <- rename(df, c(count="Number", tbburden="WHO TB incidence", region="Region", COB="Country of birth"))
+@
+
+\newpage
+\subsection{Countries stratified by region and WHO TB burden}
+<<'print full table'>>=
+x.big <- xtable(df,label='tabbig',caption='Number of status adjusters by, region, country of birth and TB burden')
+print(x.big, tabular.environment='longtable', floating=FALSE, include.rownames=FALSE, size="small")
+@
+\FloatBarrier
+
+\newpage
+\section{Time to status adjustment} 
+Figure 1 shows the cumulative probability of status adjustment for all non-immigrants status adjustment applicants.
+<<'defining survival frame'>>=
+# define custom function to create a survival data.frame
+#This data.frame will allow use of ggplot to plot the survival function (rather than using plot)
+#The original code for creating this data.frame (provide url) was modified to plot the hazard function (cumevent) rather than the survival function
+createSurvivalFrame <- function(f.survfit){
+  # initialise frame variable
+  f.frame <- NULL
+  # check if more then one strata
+  if(length(names(f.survfit$strata)) == 0){
+    # create data.frame with data from survfit
+    f.frame <- data.frame(time=f.survfit$time, n.risk=f.survfit$n.risk, n.event=f.survfit$n.event, n.censor = f.survfit
+                          $n.censor, surv=f.survfit$surv, cumevent=f.survfit$cumevent, upper=f.survfit$upper, lower=f.survfit$lower)
+    # create first two rows (start at 1)
+    f.start <- data.frame(time=c(0, f.frame$time[1]), n.risk=c(f.survfit$n, f.survfit$n), n.event=c(0,0),
+                          n.censor=c(0,0), surv=c(1,1), cumevent=c(0,0), upper=c(1,1), lower=c(1,1))
+    # add first row to dataset
+    f.frame <- rbind(f.start, f.frame)
+    # remove temporary data
+    rm(f.start)
+  }
+  else {
+    
+    # create vector for strata identification
+    f.strata <- NULL
+    for(f.i in 1:length(f.survfit$strata)){
+      # add vector for one strata according to number of rows of strata
+      f.strata <- c(f.strata, rep(names(f.survfit$strata)[f.i], f.survfit$strata[f.i]))
+    }
+    # create data.frame with data from survfit (create column for strata)
+    f.frame <- data.frame(time=f.survfit$time, n.risk=f.survfit$n.risk, n.event=f.survfit$n.event, n.censor = f.survfit
+                          $n.censor, surv=f.survfit$surv, cumevent=f.survfit$cumevent, upper=f.survfit$upper, lower=f.survfit$lower, strata=factor(f.strata))
+    # remove temporary data
+    rm(f.strata)
+    # create first two rows (start at 1) for each strata
+    for(f.i in 1:length(f.survfit$strata)){
+      # take only subset for this strata from data
+      f.subset <- subset(f.frame, strata==names(f.survfit$strata)[f.i])
+      # create first two rows (time: 0, time of first event)
+      f.start <- data.frame(time=c(0, f.subset$time[1]), n.risk=rep(f.survfit[f.i]$n, 2), n.event=c(0,0),
+                            n.censor=c(0,0), surv=c(1,1), cumevent=c(0,0), upper=c(1,1), lower=c(1,1), strata=rep(names(f.survfit$strata)[f.i],
+                                                                                                                  2))
+      # add first two rows to dataset
+      f.frame <- rbind(f.start, f.frame)
+      # remove temporary data
+      rm(f.start, f.subset)
+    }
+    # reorder data
+    f.frame <- f.frame[order(f.frame$strata, f.frame$time), ]
+    # rename row.names
+    rownames(f.frame) <- NULL
+  }
+  # return frame
+  return(f.frame)
+}
+
+# define custom function to draw kaplan-meier curve with ggplot
+qplot_survival <- function(f.frame, f.CI="default", f.shape=3){
+  # use different plotting commands dependig whether or not strata's are given
+  if("strata" %in% names(f.frame) == FALSE){
+    # confidence intervals are drawn if not specified otherwise
+    if(f.CI=="default" | f.CI==TRUE ){
+      # create plot with 4 layers (first 3 layers only events, last layer only censored)
+      # hint: censoring data for multiple censoring events at timepoint are overplotted
+      # (unlike in plot.survfit in survival package)
+      ggplot(data=f.frame) + geom_step(aes(x=time, y=cumevent), direction="hv") + geom_step(aes(x=time,
+                                                                                                y=upper), directions="hv", linetype=2) + geom_step(aes(x=time,y=lower), direction="hv", linetype=2)
+    }
+    else {
+      # create plot without confidence intervalls
+      ggplot(data=f.frame) + geom_step(aes(x=time, y=cumevent), direction="hv")
+    }
+  }
+  else {
+    if(f.CI=="default" | f.CI==FALSE){
+      # without CI
+      ggplot(data=f.frame, aes(group=strata, colour=strata)) + geom_step(aes(x=time, y=cumevent),
+                                                                         direction="hv")
+    }
+    else {
+      # with CI (hint: use alpha for CI)
+      ggplot(data=f.frame, aes(colour=strata, group=strata)) + geom_step(aes(x=time, y=cumevent),
+                                                                         direction="hv") + geom_step(aes(x=time, y=upper), directions="hv", linetype=2, alpha=0.5) +
+                                                                           geom_step(aes(x=time,y=lower), direction="hv", linetype=2, alpha=0.5)
+    }
+  }
+}
+@
+
+
+<<'time to status adjustment-overall', fig.height=6,fig.width=8,warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants">>=
+#Survival frame
+t.survfit <- survfit(Surv(texamyr, status)~1, data=ni.main)
+t.survfit$cumevent <- 1-t.survfit$surv
+t.survframe <- createSurvivalFrame(t.survfit)
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") 
+#false option next to t.survframe is to suppress the CIs.
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+\FloatBarrier
+
+%Time to status adjustment by country of birth
+
+<<'time to status adjustment-by country of birth',warning=FALSE,eval=FALSE>>=
+##strata - by country
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=ni.main)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+#this plot is too crowded and non-meaninfgful but here to just to show; the plots to follow break up this plot by TB burden and geographical region, making them more interpretable.
+p <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 10)) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(title="Status adjustment in non-immigrant applicants") + opts(legend.position="none")
+
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8)) 
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) 
+@
+
+\newpage
+\subsection{Time to status adjustment by country of birth and TB burden (WHO definition)}
+
+\subsubsection{High TB incidence countries}
+
+<<'time to status adjustment-high TB COB',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from high TB incidence countries">>=
+
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=hightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'high TB COB-collapse'>>=
+df <- ddply(hightb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'High TB incidence countries-table'>>=
+print(xtable(df, caption="Status adjustment applicants from countries with high WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{Medium TB incidence countries}
+
+<<'time to status adjustment-medium TB COB',fig.width=10,fig.align='center', warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from medium TB incidence countries">>=
+
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=mediumtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'medium TB COB-collapse'>>=
+df <- ddply(mediumtb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Medium TB incidence countries-table'>>=
+print(xtable(df, caption="Status adjustment applicants from countries with medium WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{Low TB incidence countries}
+
+<<'time to status adjustment-low TB COB',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from low TB incidence countries">>=
+
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=lowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'low TB COB-collapse'>>=
+df <- ddply(lowtb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Low TB incidence countries-table'>>=
+print(xtable(df, caption="Status adjustment applicants from countries with low WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Time to status adjustment by country of birth and TB burden (WHO definition) and geographical region}
+
+\subsubsection{High TB incidence countries - Asia}
+
+<<'High TB burden-Asia',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from high TB incidence countries in Asia">>=
+#Define reference lines for plots below
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=asiahightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p1 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p1 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'high tb asia-collapse'>>=
+df <- ddply(asiahightb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'High TB incidence countries-Asia-table'>>=
+print(xtable(df, caption="Status adjustment applicants from Asian countries with high WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{High TB incidence countries - Africa}
+
+<<'High TB burden-Africa',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from high TB incidence countries in Africa">>=
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=afrohightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p2 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p2 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'high tb africa-collapse'>>=
+df <- ddply(afrohightb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'High TB incidence countries-Africa-table'>>=
+print(xtable(df, caption="Status adjustment applicants from African countries with high WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{High TB incidence countries - N, C and S America}
+
+<<'High TB burden-Americas',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from high TB incidence countries in North, Central and South America">>=
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=amhightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p3 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p3 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'high tb americas-collapse'>>=
+df <- ddply(amhightb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'High TB incidence countries-Americas-table'>>=
+print(xtable(df, caption="Status adjustment applicants from North, Central and South American countries with high WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{High TB incidence countries - Carribean}
+
+<<'High TB burden-Carribean',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from high TB incidence countries in the Carribean">>=
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=carrhightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p4 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p4 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'high tb carribean-collapse'>>=
+df <- ddply(carrhightb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'High TB incidence countries-carribean-table'>>=
+print(xtable(df, caption="Status adjustment applicants from the Carribean with high WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{High TB incidence countries - Europe}
+
+<<'High TB burden-Europe',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from high TB incidence countries in Europe">>=
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=eurohightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+
+p5 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p5 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'high tb europe-collapse'>>=
+df <- ddply(eurohightb, .(COB), function(x) c(count=nrow(x),  mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'High TB incidence countries-Europe-table'>>=
+print(xtable(df, caption="Status adjustment applicants from European countries with high WHO TB incidence",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+%Combined grid of high TB incidence countries by geographical region
+
+<<'High TB burden - combined plots',fig.width=10,fig.height=30,fig.align='center',warning=FALSE,eval=FALSE>>=
+#Define reference lines for plots below
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+
+#Asia
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=asiahightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p1 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="Asia") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+#p1 + scale_fill_hue(name="Country \nof birth") #this is to change the title of the legend but it does not work
+
+
+#Africa
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=afrohightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p2 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="Africa") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Americas
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=amhightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p3 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="North, Central and South America") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Carribean
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=carrhightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p4 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="Carribean") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Europe
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=eurohightb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+
+p5 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + xlab("time to exam (years)") + opts(title="Europe") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+require(gridExtra)
+png("highTB.png", width=450, heigh=900)
+grid.arrange(p1, p2, p3, p4, p5, nrow=5, ncol=1, main=textGrob("Status adjustment in non-immigrant applicants \nfrom high TB incidence countries (>100/100,000)"), left=textGrob("Cumulative probability of adjusting status", rot=90))
+@
+
+
+\newpage
+\subsubsection{Medium TB incidence countries - Asia}
+
+<<'Medium TB burden - Asia',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from medium TB incidence countries in Asia">>=
+#Define reference lines for plots below
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+
+#Asia
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=asiamedtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p1 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p1 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'medium tb asia-collapse'>>=
+df <- ddply(asiamedtb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Medium TB incidence countries-Asia-table'>>=
+print(xtable(df, caption="Status adjustment applicants from medium WHO TB incidence countries in Asia",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{Medium TB incidence countries - N, C and S America}
+
+<<'Medium TB burden - Americas',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from medium TB incidence countries in North, Central and South America">>=
+#Americas
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=ammedtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p2 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p2 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'medium tb americas-collapse'>>=
+df <- ddply(ammedtb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Medium TB incidence countries-Americas-table'>>=
+print(xtable(df, caption="Status adjustment applicants from medium WHO TB incidence countries in N, C and S America",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{Medium TB incidence countries - Europe}
+
+<<'Medium TB burden - Europe',fig.width=10,fig.align='center',warning=FALSE, fig.cap="Status adjustment in non-immigrant applicants from medium TB incidence countries in Europe">>=
+#Europe
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=euromedtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+
+p3 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p3 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'medium tb europe - collapse'>>=
+df <- ddply(euromedtb, .(COB), function(x) c(count=nrow(x),  mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Medium TB incidence countries-Europe-table'>>=
+print(xtable(df, caption="Status adjustment applicants from medium WHO TB incidence countries in Europe",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+%Combined grid of medium TB incidence countries by geographical region
+
+<<'Medium TB burden - combined plots',fig.width=10,fig.height=20,fig.align='center',warning=FALSE,eval=FALSE>>=
+#Define reference lines for plots below
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+
+#Asia
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=asiamedtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p1 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="Asia") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Americas
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=ammedtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p2 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="North, Central and South America") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Europe
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=euromedtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+
+p3 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + xlab("time to exam (years)") + opts(title="Europe") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+require(gridExtra)
+pdf("mediumTB.pdf", width=8.50, heigh=11.0)
+grid.arrange(p1, p2, p3, nrow=3, ncol=1, main=textGrob("Status adjustment in non-immigrant applicants \nfrom medium TB incidence countries (20-100/100,000)"), left=textGrob("Cumulative probability of adjusting status", rot=90))
+ggsave(file="mediumTB.png", plot=p, dpi=400)
+@
+
+\newpage
+\subsubsection{Low TB incidence countries - Americas}
+
+<<'Low TB burden region - Americas',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from low TB incidence countries in N, C and S America (Canada)">>=
+#Define reference lines for plots below
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+
+#Americas
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=amlowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p1 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p1 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'low tb americas-collapse'>>=
+df <- ddply(amlowtb, .(COB), function(x) c(count=nrow(x),  mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'lOW TB incidence countries-americas-table'>>=
+print(xtable(df, caption="Status adjustment applicants from low WHO TB incidence countries in N, C and S America (Canada)",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{Low TB incidence countries - Carribean}
+
+<<'Low TB burden region - Carribean',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from low TB incidence countries in the Carribean">>=
+#Carribean
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=carrlowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p2 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p2 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'low tb carribean-collapse'>>=
+df <- ddply(carrlowtb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'lOW TB incidence countries-carribean-table'>>=
+print(xtable(df, caption="Status adjustment applicants from low WHO TB incidence countries in the Carribean",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsubsection{Low TB incidence countries - Europe}
+
+<<'Low TB burden region - Europe',fig.width=10,fig.align='center',warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants from low TB incidence countries in Europe">>=
+#Europe
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=eurolowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+
+p3 <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p3 + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'low tb europe-collapse'>>=
+df <- ddply(eurolowtb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'lOW TB incidence countries-Europe-table'>>=
+print(xtable(df, caption="Status adjustment applicants from low WHO TB incidence countries in Europe",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+\FloatBarrier
+
+
+%Combined grid of low TB incidence countries by geographical region
+
+<<'low TB burden regions-combined plots',fig.width=10,fig.height=20,fig.align='center',warning=FALSE,eval=FALSE>>=
+#Define reference lines for plots below
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+
+#Americas
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=amlowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p1 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="North, Central and South America (Canada)") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Carribean
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=carrlowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+p2 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + opts(title="Carribean") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+#Europe
+#survival frame
+t.survfit <- survfit(Surv(texamyr, status)~COB, data=eurolowtb)
+t.survfit$cumevent <- 1- t.survfit$surv #to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+
+p3 <- qplot_survival(t.survframe, FALSE) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + xlab("time to exam (years)") + opts(title="Europe") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+require(gridExtra)
+pdf("lowTB.pdf", width=8.50, heigh=11.0)
+grid.arrange(p1, p2, p3, nrow=3, ncol=1, main=textGrob("Status adjustment in non-immigrant applicants \nfrom low TB incidence countries (<20/100,000)"), left=textGrob("Cumulative probability of adjusting status", rot=90))
+@
+
+\end{document}

@@ -1,0 +1,32 @@
+\documentclass{article}
+\documentclass{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, cache=TRUE, results='asis')
+library(xtable)
+library(tables)
+@
+
+\title{Summary of non-immigrants in the US applying for status adjustment-USCIS data}
+\subtitle{Country of birth and non-immigrant visa types}
+\author{John Painter and TBESC}
+\maketitle
+\tableofcontents          
+\listoffigures  
+%\listoftables
+
+\newpage
+
+
+\end{document}

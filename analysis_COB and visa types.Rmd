@@ -1,0 +1,160 @@
+USCIS data on status adjustment from non-immigrant visa status to US permanent residency
+========================================================
+Analysis - Countries of birth and US non-immigrant visa types
+By:       Sasi Jonnalagadda  
+Date:     `r date()`
+
+Key questions to be addressed:
+1. What is the timing of the civil surgeon examination, a mandatory medical exam for application for status adjustment, since the time of entry into the US as a non-immigrant?
+2. What is the impact of this exam and it's timing on prevention of TB cases among foreign born individuals in the US?
+
+Key questions addressed in this analysis:
+1. Which countries do applicants for status adjustment represent most frequently?
+2. What non-immigrant visa types fo these applicants enter the US on?
+3. How long are the non-immigrants staying in the US before adjusting their status?  The dataset from USCIS does not contain dates on the civil surgeon exam which happens approximately 1 year before or after application for status adjustment is filed.  Therefore, the application date in the USCIS dataset has been used as a proxy for the civil surgeon exam.
+
+```{r options, echo=FALSE}
+# Set options for report
+opts_chunk$set(comment = NA)
+opts_chunk$set(echo = FALSE)
+opts_chunk$set(message = FALSE)
+```
+
+Dataset being used for this is ni.main
+```{r "dataset",cache=TRUE}
+load("~/Analyses/uscis data/uscis/uscis/ni.main.Rda")
+str(ni.main)
+```
+
+#Summary of time to exam (variable - texamyr)
+
+```{r "summary"}
+summary(ni.main$texamyr)
+require(ggplot2)
+qplot(texamyr, data=ni.main, geom = "histogram", binwidth=0.1, xlim=c(0,20)) +
+  xlab("Time from last arrival in US to application for status adjustment (year)") + 
+  ylab("Frequency") + opts(title="Non-immigrant applicants for status adjustment")
+```
+
+1. Most common countries of birth of applicants for status adjustment
+
+*1a. By WHO defined TB regions (TB incidence rate of <20, 20-100, >100/100,000)
+
+``` {r "country of birth",cache=TRUE}
+#Most common countries - this list was generated in the datasets2 code 
+#includes countries with >20,000 individuals per country in the uscis dataset
+
+#Aggregate over COB (country of birth) and tbburden (3 categories of TB incidence (<20, 20-100, >100/100,000) )
+aggdata <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden), FUN=length)
+keepvars <- names(aggdata) %in% c("Group.1", "Group.2", "COB")
+aggdata <- aggdata[keepvars]
+###Rename variables
+require(reshape)
+aggdata <- rename(aggdata, c(Group.1="cob", Group.2="tbburden", COB="Number"))
+aggdata <- aggdata[order(-aggdata$Number),]
+list(aggdata)
+```
+
+*1b. Plotting bargraphs by country of birth
+
+```{r "country of birth (plot)",fig.height=8, fig.width=8, fig.align='center'}
+#Plotting bargraphs
+require(ggplot2)
+require(scales)
+
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata, cob=reorder(cob, Number)) #Countries appreas from low to high frequency
+
+#this plot will contain cob on x-axis
+p <- ggplot(data=cob_order, aes(x=cob, y=Number)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") + opts(title="Country of birth of non-immigrant applicants for status adjustment")
+
+#this plot will flip the axes and show cob on y-axis (easier to read)
+p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000))
+```
+
+*1c. Country of birth stratified by TB regions
+
+```{r "country of birth by TB regions", fig.height=5, fig.width=15, fig.align='center'}
+#By WHO TB regions (Facet by tbburden (WHO))
+
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden, ncol=3, scales="free") +
+  opts(title="Country of birth of non-immigrant applicants for status adjustment, by TB burden")
+```
+
+*1d. By Yecai defined TB regions (TB incidence rate of <15, 15-100, >100/100,000)
+
+``` {r "Yecai TB classification", fig.height=5, fig.width=15, fig.align='center',cache=TRUE}
+#Aggregate over COB and tbburden.yecai
+aggdata.yecai <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden.yecai), FUN=length)
+keepvars <- names(aggdata.yecai) %in% c("Group.1", "Group.2", "COB")
+aggdata.yecai <- aggdata.yecai[keepvars]
+###Rename variables
+require(reshape)
+aggdata.yecai <- rename(aggdata.yecai, c(Group.1="cob", Group.2="tbburden.yecai", COB="Freq"))
+
+##By Yecai TB regions
+require(ggplot2)
+require(scales)
+
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.yecai, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") + opts(title="Country of birth of non-immigrant applicants for status adjustment")
+
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden.yecai, ncol=3, scales="free") +
+  opts(title="Country of birth of non-immigrant applicants for status adjustment, by TB burden (Yecai classification)")
+```
+
+
+2. Most common visa types 
+
+```{r "visa types", fig.align='center',cache=TRUE}
+#Most common visa types
+require(ggplot2)
+require(reshape)
+library(scales)
+visacollapse <- as.data.frame(table(droplevels(ni.main)$visacat)) #This takes the table command and converts the output into a dataframe which can then be analyzed
+visacollapse <- visacollapse[order(-visacollapse$Freq),] #order the freq of visatypes from high to low
+visacollapse <- rename(visacollapse, c(Var1="visa"))
+
+###Pre-graphing code for ordering the visa types by frequency and not their numeric code 
+visacollapse_reorder <- transform(visacollapse, visa=reorder(visa, Freq)) #makes graph appear with visa types from low to high freq
+
+###This keep the visa type on the x-axis
+pvisatype <- ggplot(data=visacollapse_reorder, aes(x=visa, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Visa Type") + ylab("Frequency") + opts(title="Non-immigrant applicants for status adjustment")
+
+###This flips the coordinates (coord_flip) 
+pvisatype + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(25000, 100000, 200000, 300000, 400000, 500000, 600000, 700000))
+```
+
+*2a. Visa categories defined by Yecai
+
+```{r "Yecai's visa categories", fig.height=5, fig.width=15, fig.align='center',cache=TRUE}
+##Yecai's visatypes
+visacollapse.yecai <- as.data.frame(table(droplevels(ni.main)$visacat.yecai)) #This takes the table command and converts the output into a dataframe which can then be analyzed
+require(reshape)
+visacollapse.yecai <- rename(visacollapse.yecai, c(Var1="visa"))
+
+###Pre-graphing code for ordering the visa types by frequency and not their numeric code 
+visacollapse.yecai_reorder <- transform(visacollapse.yecai, visa=reorder(visa, Freq)) #makes graph appear with visa types from low to high freq
+
+###This keep the visa type on the x-axis
+require(ggplot2)
+pvisatype <- ggplot(data=visacollapse.yecai_reorder, aes(x=visa, y=Freq)) + geom_bar(colour="grey", width=.3) + 
+  xlab("Visa Type") + ylab("Frequency") + opts(title="Non-immigrant applicants for status adjustment, by Yecai's visa classification")
+
+###This flips the coordinates (coord_flip) 
+require(scales)
+pvisatype + geom_bar(colour="grey", width=.5) + coord_flip() + scale_y_continuous(labels=comma, breaks=c(25000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000))
+```
+
+
