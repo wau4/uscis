@@ -22,11 +22,12 @@ require(ggplot2)
 require(scales)
 @
 
-\title{Applicants for Status Adjustment in the US\\
-Time to Status Adjustment, by country of birth, geographical region and TB burden\\
+\title{Time to Status Adjustment, by country of birth, geographical region and TB burden\\
+Applicants for Status Adjustment in the US\\
 USCIS Data}
 \maketitle
 
+\newpage
 \tableofcontents           
 \listoftables
 \listoffigures
@@ -34,7 +35,6 @@ USCIS Data}
 \newpage
 <<'Load data'>>=
 load("C:/Users/wau4/Desktop/uscis/uscis/ni.main.Rda")
-ni.main <- ni.main[sample(1:nrow(ni.main), 5000, replace=FALSE),]
 @
 
 \section{Introduction}

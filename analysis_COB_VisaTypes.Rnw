@@ -1,0 +1,258 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE)
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+@
+
+\title{{\bf Chapter 2 - Countries of Birth and Non-immigrant Visa Types}\\
+Applicants for Status Adjustment in the US\\
+USCIS Data}
+\date{\today}
+\maketitle
+
+\newpage
+\tableofcontents           
+\listoftables
+\listoffigures
+
+\newpage
+<<'load data'>>=
+load("C:/Users/wau4/Desktop/uscis/uscis/ni.Rda")
+@
+
+The non-immigrant dataset after going though data cleaning and after excluding refugees, has \Sexpr{nrow(ni)} records, and Table 1 shows this number stratified by immigration status.
+
+<<'INS status - collapse'>>=
+require(plyr)
+require(xtable)
+df <- ddply(ni, .(status), function(x) c(count=nrow(x)))
+df <- rename(df, c(status="Status", count="Number"))
+df$Percent <- 100* df$Number/sum(df$Number)
+df <- df[order(-df$Number),]
+@
+
+<<'INS status table'>>=
+print(xtable(df, caption="INS statuses in the non-immigrant dataset"), include.rownames=FALSE)
+@
+
+\section{Further modification and descriptio of the non-immigrant dataset}
+\subsection{Countries of birth and geographical regions}
+<<'count country of birth'>>=
+cobcount <- as.data.frame(table(ni$COB))
+@
+There are \Sexpr{nrow(ni)} countries represented in the non-immigrants dataset (countries entered with name variations).  
+
+
+<<'COB and regions'>>=
+#To identify and subset the most common countries of birth (>=20,000)
+####Obtain frequency of countries of birth
+#generate a table collapsed by COB and will give number of obs per country
+cobfreq <- as.data.frame(table(ni$COB))
+#order countries by frequency (freq)
+cobfreq <- cobfreq[order(-cobfreq$Freq),]
+#Identify countries with >20000 individuals applying for status adj over last 10 years
+cobfreq1 <- subset(cobfreq, Freq > 20000, select=c(Var1, Freq))
+
+##Go back to the original ni dataframe and subset it to the countries identified above
+##fixing country names
+ni$COB[ni$COB == "KOREA"] <- "SKORE" #replacing Korea with skore (i.e. skorea)
+ni$COB[ni$COB == "USSR"] <- "RUSSI" #replacing USSR with Russi (i.e. Russia)
+
+#Recategorizing COB in the ni dataframe to classify countries with <20000 applicants as NA, which will be excluded in the next step 
+ni <- within(ni, {
+  cobcat <- as.factor(ni$COB)
+  cobcat[COB!="MEXIC" & COB!="CHINA" & COB!="INDIA" & COB!="CUBA" & COB!="PHILI" & COB!="COLOM" & COB!="SKORE" 
+         & COB!="CANAD" & COB!="BRAZI" & COB!="HAITI" & COB!="PERU" & COB!="UK" & COB!="JAMAI" & COB!="DR"
+         & COB!="VENEZ" & COB!="PAKIS" & COB!="ELSAL" & COB!="VIETN" & COB!="POLAN" & COB!="GUATE" & COB!="ECUAD"
+         & COB!="ARGEN" & COB!="GERMA" & COB!="UKRAI" & COB!="NIGIA" & COB!="JAPAN" & COB!="TAIWA"
+         & COB!="TRINI" & COB!="ETHIO" & COB!="ISRAE" & COB!="RUSSI" & COB!="GHANA" & COB!="THAIL" & COB!="IRAN"
+         & COB!="ROMAN" & COB!="HONDU" & COB!="FRANC" & COB!="KENYA"] <- NA
+})
+
+
+#Classify countries by TB burden - WHO classification
+#creating two datasets 1) with countries with >=20,000 applicants for status adjustment and
+#2) with countries <20,000
+ni.main <- subset(ni, cobcat!="NA", drop=TRUE)
+ni.main$COB <- factor(ni.main$COB)
+ni.main$cobcat <- factor(ni.main$cobcat)
+
+ni.other <- subset(ni, cobcat=="NA", drop=TRUE)
+ni.other$COB <- factor(ni.other$COB)
+ni.other$cobcat <- factor(ni.other$cobcat)
+
+#value labels
+ni.main <- ni.main
+levels(ni.main$COB)[levels(ni.main$COB)=="MEXIC"] <- "Mexico"
+levels(ni.main$COB)[levels(ni.main$COB)=="CHINA"] <- "China"
+levels(ni.main$COB)[levels(ni.main$COB)=="INDIA"] <- "India"
+levels(ni.main$COB)[levels(ni.main$COB)=="CUBA"] <- "Cuba"
+levels(ni.main$COB)[levels(ni.main$COB)=="PHILI"] <- "Philippines"
+levels(ni.main$COB)[levels(ni.main$COB)=="COLOM"] <- "Colombia"
+levels(ni.main$COB)[levels(ni.main$COB)=="SKORE"] <- "S Korea"
+levels(ni.main$COB)[levels(ni.main$COB)=="CANAD"] <- "Canada"
+levels(ni.main$COB)[levels(ni.main$COB)=="BRAZI"] <- "Brazil"
+levels(ni.main$COB)[levels(ni.main$COB)=="HAITI"] <- "Haiti"
+levels(ni.main$COB)[levels(ni.main$COB)=="PERU"] <- "Peru"
+levels(ni.main$COB)[levels(ni.main$COB)=="UK"] <- "UK"
+levels(ni.main$COB)[levels(ni.main$COB)=="JAMAI"] <- "Jamaica"
+levels(ni.main$COB)[levels(ni.main$COB)=="DR"] <- "Dom Republic"
+levels(ni.main$COB)[levels(ni.main$COB)=="VENEZ"] <- "Venezuela"
+levels(ni.main$COB)[levels(ni.main$COB)=="PAKIS"] <- "Pakistan"
+levels(ni.main$COB)[levels(ni.main$COB)=="ELSAL"] <- "El Salvador"
+levels(ni.main$COB)[levels(ni.main$COB)=="VIETN"] <- "Viet Nam"
+levels(ni.main$COB)[levels(ni.main$COB)=="POLAN"] <- "Poland"
+levels(ni.main$COB)[levels(ni.main$COB)=="GUATE"] <- "Guatemala"
+levels(ni.main$COB)[levels(ni.main$COB)=="ECUAD"] <- "Ecuador"
+levels(ni.main$COB)[levels(ni.main$COB)=="ARGEN"] <- "Argentina"
+levels(ni.main$COB)[levels(ni.main$COB)=="GERMA"] <- "Germany"
+levels(ni.main$COB)[levels(ni.main$COB)=="UKRAI"] <- "Ukraine"
+levels(ni.main$COB)[levels(ni.main$COB)=="NIGIA"] <- "Nigeria"
+levels(ni.main$COB)[levels(ni.main$COB)=="JAPAN"] <- "Japan"
+levels(ni.main$COB)[levels(ni.main$COB)=="TAIWA"] <- "Taiwan"
+levels(ni.main$COB)[levels(ni.main$COB)=="TRINI"] <- "Trinidad"
+levels(ni.main$COB)[levels(ni.main$COB)=="ETHIO"] <- "Ethiopia"
+levels(ni.main$COB)[levels(ni.main$COB)=="ISRAE"] <- "Israel"
+levels(ni.main$COB)[levels(ni.main$COB)=="RUSSI"] <- "Russia"
+levels(ni.main$COB)[levels(ni.main$COB)=="GHANA"] <- "Ghana"
+levels(ni.main$COB)[levels(ni.main$COB)=="THAIL"] <- "Thailand"
+levels(ni.main$COB)[levels(ni.main$COB)=="IRAN"] <- "Iran"
+levels(ni.main$COB)[levels(ni.main$COB)=="ROMAN"] <- "Romania"
+levels(ni.main$COB)[levels(ni.main$COB)=="HONDU"] <- "Honduras"
+levels(ni.main$COB)[levels(ni.main$COB)=="FRANC"] <- "France"
+levels(ni.main$COB)[levels(ni.main$COB)=="KENYA"] <- "Kenya"
+
+#Generating regions
+ni.main <- within(ni.main, {
+  region <- NA
+  region[COB=="China" | COB=="India" | COB=="Philippines" | COB=="S Korea" | COB=="Pakistan" | COB=="Vietnam" | COB=="Japan" | COB=="Taiwan" | COB=="Thailand" | COB=="Iran"] <- "Asia"
+  region[COB=="Mexico" | COB=="Colombia" | COB=="Brazil" | COB=="Peru" | COB=="Venezuela" | COB=="El Salvador" | COB=="Guatemala" | COB=="Ecuador" | COB=="Argentina" | COB=="Honduras" | COB=="Canada"] <- "Americas"
+  region[COB=="UK" | COB=="Poland" | COB=="Germany" | COB=="Ukraine" | COB=="Israel" | COB=="Russia" | COB=="Romania" | COB=="France"] <- "Europe"
+  region[COB=="Nigeria" | COB=="Ethiopia" | COB=="Ghana" | COB=="Kenya"] <- "Africa"
+  region[COB=="Cuba" | COB=="Haiti" | COB=="Jamaica" | COB=="Dom Republic" | COB=="Trinidad"] <- "Carribean"
+})
+#Note: Israel classified under Europe
+
+#check if all countries have been assigned a region
+require(doBy)
+collapse2 <- summaryBy(COB ~ region + COB, FUN=length, data=ni.main)
+require(reshape)
+collapse1 <- rename(collapse2, c(region="Region", COB="Country of birth", COB.length="Number"))
+@
+
+Table 2 presents a list of countries with $\geq$20,000 status adjustment applicants between 1999-2011, by geographical region.  
+<<'Regions and country of birth-table'>>=
+print(xtable(collapse1, caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status"), include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+Graphical representation of Table 3...
+<<'countries of birth-plot',fig.height=6, fig.width=8, fig.align='center',fig.caption="Country of birth of non-immigrant applicants for status adjustment">>=
+#Plotting bargraphs
+require(ggplot2)
+require(scales)
+
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+cob_order <- transform(collapse2, COB=reorder(COB, COB.length))
+#this plot will contain cob on x-axis
+p <- ggplot(data=cob_order, aes(x=COB, y=COB.length)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") 
+
+#this plot will flip the axes and show cob on y-axis (easier to read)
+p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000))
+@
+\FloatBarrier
+
+\section{Visa types}
+<<'count non-immigrant visa types'>>=
+visacount <- as.data.frame(table(droplevels(ni.main$visatype)))
+visacount$Var1 <- as.factor(visacount$Var1)
+@
+
+Of the total \Sexpr{nlevels(visacount$Var1)} non-immigrant visa types represented in this dataset, a list of visatypes with $\geq$26,500 applicants for status adjustment between 1999-2011 is shown in Table 4.
+
+<<'Visa types'>>=
+#Most common visa types
+#This takes the table command and converts the output into a dataframe which can then be analyzed
+visacollapse <- as.data.frame(table(droplevels(ni.main)$visatype)) #use drop levels here because of the NAs that were dropped while creating the ni.main dataframe
+
+visacollapse <- visacollapse[order(-visacollapse$Freq),] #order the freq of visatypes from high to low
+
+#Renaming this visa type; L1A seems to be the same as L1 (inter-company exchange) (http://travel.state.gov/visa/temp/types/types_1286.html)
+visacollapse$Var1[visacollapse$Var1 == "L1A"] <- "L1"
+
+visa.25 <- visacollapse[visacollapse$Freq > 26500,] #Restricting
+require(reshape)
+visa.25 <- rename(visa.25, c(Var1="visa"))
+
+#Renaming this visa type; L1A seems to be the same as L1 (inter-company exchange) (http://travel.state.gov/visa/temp/types/types_1286.html)
+ni.main$visatype[ni.main$visatype == "L1A"] <- "L1"
+
+#Recategorizing visa types; those with >26000 status adjusters will be kept as is and the rest will be classified as NA (missing) 
+ni.main <- within(ni.main, {
+  visacat <- as.factor(ni.main$visatype)
+  visacat[visatype!="B2" & visatype!="AS" & visatype!="H1B" & visatype!="EWI" & visatype!="H4" & visatype!="PR" 
+          & visatype!="K1" & visatype!="F1" & visatype!="L2" & visatype!="L1"
+          & visatype!="WT" & visatype!="K3" & visatype!="B1" & visatype!="CP" & visatype!="J1"] <- NA
+})
+ni.main$visacat <- as.factor(ni.main$visacat)
+
+visacat <- as.data.frame(table(droplevels(ni.main$visacat)))
+visacat <- visacat[order(-visacat$Freq),]
+visacat <- rename(visacat, c(Var1="Visa type", Freq="Number"))
+visacat$Percent <- 100* visacat$Number/sum(visacat$Number)
+@
+
+
+
+
+<<'Yecai's visa classification'>>=
+#Recategorize visa types - using Yecai's classification
+
+ni.main <- within(ni.main, {
+  visacat.yecai <- NA
+  visacat.yecai[visatype=="F1" | visatype=="F2" | visatype=="J1" | visatype=="J2" | visatype=="M1" | visatype=="M2"
+                | visatype=="E1" | visatype=="E2" | visatype=='E3' | visatype=="H1B" | visatype=="H1C" | visatype=="H2A"
+                | visatype=="H2B" | visatype=="H2R" | visatype=="H3" | visatype=="H4" | visatype=="L1" | visatype=="L2"
+                | visatype=="O1" | visatype=="O2" | visatype=="O3" | visatype=="P1" | visatype=="P2" | visatype=="P3"
+                | visatype=="P4" | visatype=="Q1" | visatype=="R1" | visatype=="R2" | visatype=="TD" | visatype=="TN"] <- "1"
+  visacat.yecai[visatype=="B1" | visatype=="B2" | visatype=="GB" | visatype=="GT" | visatype=="WB" | visatype=="WT"] <- "2"
+  visacat.yecai[visatype=="A1" | visatype=="A2" | visatype=="A3" | visatype=="G1" | visatype=="G2" | visatype=="G3" | visatype=="G4"
+                | visatype=="G5" | visatype=="N1" | visatype=="N2" | visatype=="N3" | visatype=="N4" | visatype=="N5" | visatype=="N6"
+                | visatype=="N7"] <- "3"
+  visacat.yecai[visatype=="AS" | visatype=="PR"] <- "4"
+  visacat.yecai[visatype=="EWI"] <- "5"
+})
+
+ni.main$visacat.yecai <- as.factor(ni.main$visacat.yecai)
+
+#Value labels
+ni.main <- ni.main
+levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="1"] <- "Students, exchange visitors, temp workers & families"
+levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="2"] <- "Tourists and business travelers"
+levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="3"] <- "Diplomats and families"
+levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="4"] <- "Asylees and parolees"
+levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="5"] <- "Entry without inspection"
+@
+
+\end{document}

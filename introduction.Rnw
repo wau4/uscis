@@ -1,0 +1,237 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE)
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+@
+
+\title{{\bf Chapter 1 - Introduction}\\
+Applicants for Status Adjustment in the US\\
+USCIS Data}
+\author{Sasi Jonnalagadda, John Painter\\
+Epidemiology Team\\
+Immigrant, Refugee and Migrant Health Branch}
+\date{\today}
+\maketitle
+
+\newpage
+\tableofcontents           
+\listoftables
+\listoffigures
+
+\newpage
+
+\section{Introduction}
+
+Individuals applying for adjustment of status to legal permanent residency (LPR) in the United States (US) are required by the Department of Homeland Security (DHS) to undergo a medical examination.  The purpose of this examination is to establish that an applicant is not inadmissible to the United States on public health grounds.  These medical examinations are conducted by civil surgeons designated by the United States Citizenship and Immigration Services (USCIS) according to technical instructions provided by the Centers for Disease Control and Prevention. 
+
+Individuals seeking status adjustment fall into two major categories: refugees and individuals who entered the US as non-immigrants now seeking status adjustment to LPR. 
+
+LPR applicants who entered the United States as refugees are not required to repeat the entire medical examination unless a Class A medical condition was found at the overseas examination; the primary purpose is to confirm compliance with the vaccination requirements. 
+
+LPR applicants who entered the US as nonimmigrants (for example, students or workers and their families) are required to undergo a complete medical examination.  For most, no medical examination would have been required prior to their arrival in the US.  Students may undergo some form of medical screening at their respective educational institutions, but this process is not regulated by the CDC.  Recent analyses by investigators at the Immigrant, Refugee, and Migrant Health (IRHM) Branch in CDC’s Division of Global Migration and Quarantine estimated that international students and exchange visitors contribute significantly to the tuberculosis burden in the US: they show a rate of 60.9 cases/100,000 admissions within the first year of their arrival (Liu, PLoSone 2012).  
+
+Therefore, the civil surgeons exam on these individuals is potentially the only systematic information on the conditions of public health importance in this population, particularly TB.  Since the risk of TB among foreign-born individuals in the US is significantly associated with the duration of stay in the US, the timing of the Civil Surgeon exam is of importance.      
+
+Therefore, two key questions that would be important to address are:
+\begin{enumerate}
+\item What is the timing of the civil surgeon examination, a mandatory medical exam for application for status adjustment, since the time of entry into the US as a non-immigrant?
+\item What is the impact of this exam and it's timing on prevention of TB cases among foreign born individuals in the US?
+\end{enumerate}
+
+The medical forms from the Civil Surgeon exams are sent to USCIS by the applicant for status adjustment and are maintained in a paper form by the USCIS and not entered into a database.  Therefore, the civil surgeon exam data is not readily accessible for an analytic purpose.  However, a basic demographic form (I-485) that accompanies the application for status adjustment is entered into a database by USCIS but the date of the Civil Surgeon exam is not recorded in this form.  
+
+{\bf Data request to USCIS:}
+In March 2012, the Epidemiology team at IRHM initiated a request to obtain data from USCIS to explore how closely we could approximate the civil surgeon exam date with other dates that are associated with an individual applicant.  In response to this request, USCIS provided us with data from 1991-2011 on approved status adjustment applications that contained the following variables: 
+\begin{itemize}
+\item Most recent US entry date
+\item Application receipt date
+\item Application approval date
+\item Country of birth of the applicant
+\item Visa status at the time of applying for status adjustment
+\end{itemize}
+
+\section{Aims}
+Key questions addressed in this analysis:
+\begin{enumerate}
+\item Which countries do applicants for status adjustment represent most frequently?
+\item What non-immigrant visa types do these applicants enter the US on?
+\item How long do non-immigrants stay in the US before adjusting their status?  
+\end{enumerate}
+
+As mentioned earlier, the data from USCIS does not contain dates on the civil surgeon exam which happens approximately 1 year before or after application for status adjustment is filed.  Therefore, the application date in the USCIS dataset has been used as a proxy for the civil surgeon exam date.
+
+\newpage
+\section{Data description}
+
+<<'Data', cache=TRUE>>=
+uscis <- read.csv("C:/Users/wau4/Desktop/uscis/uscis2.csv", sep=",", header=T)
+@
+
+The dataset contains the following variables.  Note: This is the raw dataset plus date variables and a time difference variable created in SAS.
+<<'uscis variable names',results='markup'>>=
+names(uscis)
+@
+
+Description of variables:
+\begin{itemize}
+\item ReceiptNumber: Application receipt number.  
+\item Form: Data taken from form I-485
+\item ReceiptDate: Date a case is receipted into USCIS inventory and establishes a place in line (first in, first out)
+\item ReceivedDate: This date is used to show the date a rejected case is sent back to USCIS after correcting a problem.
+\item PrincCOB: Principal (petitioner) Country of Birth
+\item BenCOB: Beneficiary Country of Birth
+\item INSCurrentStatus: Current visa status
+\item CodePref: Immigration classification granted to the applicant.
+\item I89Class: This is the approved classification for the green card, as determined by the adjudicator and entered into Claims 3.
+\item CodeStat: No longer used; it should be blank.
+\item LastArrivalDate:  Date of last entry into the US
+\item ApprovedDate: Application approval date 
+\item *LastArrivalDate1, ApprovedDate1, ReceiptDate1, ReceivedDate1: Variables in date format
+\item *durationmo and durationyr: time (in months and years) between last arrival in US and application approval date
+\item timetoexammo and timetoexamyr: time (in months and years) between last arrival in the US and application receipt date
+\end{itemize}
+*Variables created in SAS
+
+
+<<'Drop variables'>>=
+#List the names of variables to be dropped 
+dropvars <- names(uscis) %in% c("Form", "ReceiptDate", "LastArrivalDate", "ApprovedDate", "ReceivedDate", "CodePref", "I89Class", "BenCOB", "CodeStat", "durationmo", "durationyr")
+uscis <- uscis[!dropvars]
+#renaming variables
+require(reshape)
+uscis <- rename(uscis, c(timetoexammo="texammo", timetoexamyr="texamyr", PrincCOB="COB"))
+@
+
+<<'count country of birth'>>=
+cobcount <- as.data.frame(table(uscis$COB))
+@
+
+The total number of records is the USCIS dataset is \Sexpr{nrow(uscis)} and the application dates range from \Sexpr{min(as.Date(uscis$ApprovedDate1))} to \Sexpr{max(as.Date(uscis$ApprovedDate1))}. There are \Sexpr{nrow(cobcount)} countries represented in the dataset. The number and percent of status adjustment applicants by their immigration status in this dataset are shown in Table 1: 
+
+<<'INS status'>>=
+uscis <- within(uscis, {
+  status <- NA
+  status[INSCurrentStatus=="RE"] <- "1"
+  status[INSCurrentStatus=="PR"] <- "2"
+  status[INSCurrentStatus=="AS"] <- "3"
+  status[INSCurrentStatus!="RE" & INSCurrentStatus!="AS" & INSCurrentStatus!="PR"] <- "4"
+  })
+uscis$status <- as.factor(uscis$status)
+#Value labels
+uscis <- uscis
+levels(uscis$status)[levels(uscis$status)=="1"] <- "Refugees"
+levels(uscis$status)[levels(uscis$status)=="2"] <- "Parolees"
+levels(uscis$status)[levels(uscis$status)=="3"] <- "Asylees"
+levels(uscis$status)[levels(uscis$status)=="4"] <- "Non-immigrants"
+require(plyr)
+require(xtable)
+df <- ddply(uscis, .(status), function(x) c(count=nrow(x)))
+df <- rename(df, c(status="Status", count="Number"))
+df$percent <- 100* df$Number/sum(df$Number)
+df <- df[order(-df$Number),]
+uscis <- rename(uscis, c(INSCurrentStatus="visatype"))
+@
+
+<<'INS status table'>>=
+print(xtable(df, caption="INS statuses in the USCIS dataset"), include.rownames=FALSE)
+@
+
+<<'count visatypes'>>=
+uscis.ni <- subset(uscis, status=="Non-immigrants", drop=TRUE) 
+visacount <- as.data.frame(table(droplevels(uscis.ni$visatype)))
+visacount$Var1 <- as.factor(visacount$Var1)
+@
+
+The total number of non-immigrant visa types represented in this dataset is \Sexpr{nlevels(visacount$Var1)}.  This excludes refugees, asylees and parolees.
+
+\newpage
+The annual number of applicants for status adjustment are shown in Figure 1, by their immigration status.
+<<'Extract year for plotting'>>=
+require(lubridate)
+uscis$ApprovedDate1 <- ymd(uscis$ApprovedDate1)
+uscis$year <- format(uscis$ApprovedDate1, "%Y")
+@
+
+<<'Annual number of applicants',fig.width=8,fig.height=4,fig.cap="Annual number of applicants for status adjustment">>=
+require(ggplot2)
+require(scales)
+ggplot(data=uscis, aes(x=year)) + geom_bar(aes(fill=status), position="dodge") +
+  xlab("Year of application for status adjustment") + scale_y_continuous(labels=comma,"Number") + 
+  opts(legend.justification=c(0,1), legend.position=c(0,1))
+@
+\FloatBarrier
+
+\newpage
+The cumulative number of status adjustments between 1991 to 2011 are shown in Figure 2, by immigration status.
+
+<<'calculate last.point and cumulative sum'>>=
+keepvars <- names(uscis) %in% c("status", "year")
+uscis2 <- uscis[keepvars]
+
+aggdata <- aggregate(uscis2, by=list(uscis2$status, uscis2$year), FUN=length) 
+aggdata <- aggdata[c(1,2,3)] 
+aggdata <- rename(aggdata, c(Group.1="status", Group.2="year", status="count")) #Rename Group.1 as COB
+
+require(plyr)
+status.sum = ddply(aggdata, .(status), summarize, year=I(year), total=cumsum(count))
+
+last.point = ddply(status.sum, .(status), function(x) x[c(nrow(x)),])
+@
+
+
+<<'cumulative applicants by INS status',fig.width=8,fig.height=4,fig.cap="Cumulative number of applicants for status adjustment, 1999-2011">>=
+ggplot(data=status.sum, aes(x=year, y=total, group=status)) + 
+  theme_bw() +
+  geom_line(size=.75, color="grey") +
+  geom_point(data=last.point, aes(x=year, y=total), size=4, color="grey") +
+  geom_text(data=last.point, aes(label=status), hjust = 1, vjust = 0, size = 4) +
+  scale_y_continuous (labels=comma, "Appicants for status adjustment, n") +
+  scale_x_discrete ("Year of application for status adjustment")
+@
+\FloatBarrier
+
+\section{Data management}
+\subsection{Modifying the USCIS dataset}
+
+One of the key variables in this data is the texamyr (time between last entry into the US and status adjustment application receipt date).  Let's take a closer look at this variable.  Below is the distribution of the raw variable:
+<<'describe-texamyr',results='markup'>>=
+require(Hmisc)
+describe(uscis$texamyr)
+@
+
+The negative values are due to scenarios where individuals can leave the country and re-enter after filing their application for status adjustment.  The missing values are due to a missing date of last entry into the US or date of application for status adjustment.  If either are missing the texamyr variable cannot be calculated.  
+
+<<'Handling negative and missing values (NAs) in texamyr'>>= 
+#Drop -ve and NAs in texamyr
+uscis <- uscis[which(uscis$texamyr>=0),]
+@
+
+Therefore, after dropping negative and missing values of this variable, there are \Sexpr{nrow(uscis)} records.
+
+Although ths data contains refugees, we will drop them from further analysis and focus on non-immigrants.  Asylees and parolees are being kept in this analysis.  This dataset will be referred to as the non-immigrant(ni) dataset.
+
+<<'save ni'>>=
+ni <- subset(uscis, visatype!="RE", drop=TRUE) 
+ni$visatype <- factor(ni$visatype)
+save(ni, file="ni.Rda")
+@
+
+\end{document}

@@ -1,0 +1,498 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis')
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+@
+
+\title{Time to Status Adjustment, by visa type and country of birth\\
+North, Central and South America}
+\maketitle
+
+\tableofcontents           
+\listoftables
+\listoffigures
+
+\newpage
+<<'Load data'>>=
+load("C:/Users/wau4/Desktop/uscis/uscis/ni.main.Rda")
+@
+
+<<'TB regions'>>=
+hightb <- subset(ni.main, tbburden=="high (TB incidence>100/100,000)", drop=TRUE) 
+hightb$tbburden <- factor(hightb$tbburden)
+hightb$COB <- factor(hightb$COB)
+
+mediumtb <- subset(ni.main, tbburden=="medium (TB incidence 20-100/100,000)", drop=TRUE) 
+mediumtb$tbburden <- factor(mediumtb$tbburden)
+mediumtb$COB <- factor(mediumtb$COB)
+
+lowtb <- subset(ni.main, tbburden=="low (TB incidence<20/100,000)", drop=TRUE) 
+lowtb$tbburden <- factor(lowtb$tbburden)
+lowtb$COB <- factor(lowtb$COB)
+@
+
+<<'High, medium and low TB'>>=
+amhightb <- subset(hightb, region=="Americas", drop=TRUE) 
+amhightb$region <- factor(amhightb$region)
+amhightb$COB <- factor(amhightb$COB)
+
+ammedtb <- subset(mediumtb, region=="Americas", drop=TRUE)
+ammedtb$region <- factor(ammedtb$region)
+ammedtb$COB <- factor(ammedtb$COB)
+
+amlowtb <- subset(lowtb, region=="Americas", drop=TRUE)
+amlowtb$region <- factor(amlowtb$region)
+amlowtb$COB <- factor(amlowtb$COB)
+@
+
+<<'defining survival frame'>>=
+# define custom function to create a survival data.frame
+#This data.frame will allow use of ggplot to plot the survival function (rather than using plot)
+#The original code for creating this data.frame (provide url) was modified to plot the hazard function (cumevent) rather than the survival function
+createSurvivalFrame <- function(f.survfit){
+  # initialise frame variable
+  f.frame <- NULL
+  # check if more then one strata
+  if(length(names(f.survfit$strata)) == 0){
+    # create data.frame with data from survfit
+    f.frame <- data.frame(time=f.survfit$time, n.risk=f.survfit$n.risk, n.event=f.survfit$n.event, n.censor = f.survfit
+                          $n.censor, surv=f.survfit$surv, cumevent=f.survfit$cumevent, upper=f.survfit$upper, lower=f.survfit$lower)
+    # create first two rows (start at 1)
+    f.start <- data.frame(time=c(0, f.frame$time[1]), n.risk=c(f.survfit$n, f.survfit$n), n.event=c(0,0),
+                          n.censor=c(0,0), surv=c(1,1), cumevent=c(0,0), upper=c(1,1), lower=c(1,1))
+    # add first row to dataset
+    f.frame <- rbind(f.start, f.frame)
+    # remove temporary data
+    rm(f.start)
+  }
+  else {
+    
+    # create vector for strata identification
+    f.strata <- NULL
+    for(f.i in 1:length(f.survfit$strata)){
+      # add vector for one strata according to number of rows of strata
+      f.strata <- c(f.strata, rep(names(f.survfit$strata)[f.i], f.survfit$strata[f.i]))
+    }
+    # create data.frame with data from survfit (create column for strata)
+    f.frame <- data.frame(time=f.survfit$time, n.risk=f.survfit$n.risk, n.event=f.survfit$n.event, n.censor = f.survfit
+                          $n.censor, surv=f.survfit$surv, cumevent=f.survfit$cumevent, upper=f.survfit$upper, lower=f.survfit$lower, strata=factor(f.strata))
+    # remove temporary data
+    rm(f.strata)
+    # create first two rows (start at 1) for each strata
+    for(f.i in 1:length(f.survfit$strata)){
+      # take only subset for this strata from data
+      f.subset <- subset(f.frame, strata==names(f.survfit$strata)[f.i])
+      # create first two rows (time: 0, time of first event)
+      f.start <- data.frame(time=c(0, f.subset$time[1]), n.risk=rep(f.survfit[f.i]$n, 2), n.event=c(0,0),
+                            n.censor=c(0,0), surv=c(1,1), cumevent=c(0,0), upper=c(1,1), lower=c(1,1), strata=rep(names(f.survfit$strata)[f.i],
+                                                                                                                  2))
+      # add first two rows to dataset
+      f.frame <- rbind(f.start, f.frame)
+      # remove temporary data
+      rm(f.start, f.subset)
+    }
+    # reorder data
+    f.frame <- f.frame[order(f.frame$strata, f.frame$time), ]
+    # rename row.names
+    rownames(f.frame) <- NULL
+  }
+  # return frame
+  return(f.frame)
+}
+
+# define custom function to draw kaplan-meier curve with ggplot
+qplot_survival <- function(f.frame, f.CI="default", f.shape=3){
+  # use different plotting commands dependig whether or not strata's are given
+  if("strata" %in% names(f.frame) == FALSE){
+    # confidence intervals are drawn if not specified otherwise
+    if(f.CI=="default" | f.CI==TRUE ){
+      # create plot with 4 layers (first 3 layers only events, last layer only censored)
+      # hint: censoring data for multiple censoring events at timepoint are overplotted
+      # (unlike in plot.survfit in survival package)
+      ggplot(data=f.frame) + geom_step(aes(x=time, y=cumevent), direction="hv") + geom_step(aes(x=time,
+                                                                                                y=upper), directions="hv", linetype=2) + geom_step(aes(x=time,y=lower), direction="hv", linetype=2)
+    }
+    else {
+      # create plot without confidence intervalls
+      ggplot(data=f.frame) + geom_step(aes(x=time, y=cumevent), direction="hv")
+    }
+  }
+  else {
+    if(f.CI=="default" | f.CI==FALSE){
+      # without CI
+      ggplot(data=f.frame, aes(group=strata, colour=strata)) + geom_step(aes(x=time, y=cumevent),
+                                                                         direction="hv")
+    }
+    else {
+      # with CI (hint: use alpha for CI)
+      ggplot(data=f.frame, aes(colour=strata, group=strata)) + geom_step(aes(x=time, y=cumevent),
+                                                                         direction="hv") + geom_step(aes(x=time, y=upper), directions="hv", linetype=2, alpha=0.5) +
+                                                                           geom_step(aes(x=time,y=lower), direction="hv", linetype=2, alpha=0.5)
+    }
+  }
+}
+@
+
+
+\section{High TB incidence, Countries in North, Central and South America}
+\subsection{Ecuador}
+<<'Ecuador',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Ecuador by Visa Type">>=
+#Ecuador
+ecuador <- subset(amhightb, COB =="Ecuador", drop=TRUE) 
+ecuador$COB <- factor(ecuador$COB)
+ecuador$visacat.yecai <- factor(ecuador$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=ecuador)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8)) 
+
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+
+<<'ecuador-collapse'>>=
+df <- ddply(ecuador, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'ecuador-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Ecuador",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Honduras}
+<<'Honduras',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Honduras by Visa Type">>=
+#Honduras
+honduras <- subset(amhightb, COB =="Honduras", drop=TRUE) 
+honduras$COB <- factor(honduras$COB)
+honduras$visacat.yecai <- factor(honduras$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=honduras)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'honduras-collapse'>>=
+df <- ddply(honduras, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'honduras-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Honduras",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Peru}
+<<'Peru',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Peru by Visa Type">>=
+peru <- subset(amhightb, COB =="Peru", drop=TRUE) 
+peru$COB <- factor(peru$COB)
+peru$visacat.yecai <- factor(peru$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=peru)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'peru-collapse'>>=
+df <- ddply(peru, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'peru-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Peru",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\section{Medium TB incidence, North, Central and South American countries}
+\subsection{Argentina}
+<<'Argentina',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Argentina by Visa Type">>=
+#Agentina
+argentina <- subset(ammedtb, COB =="Argentina", drop=TRUE) 
+argentina$COB <- factor(argentina$COB)
+argentina$visacat.yecai <- factor(argentina$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=argentina)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+
+<<'argentina-collapse'>>=
+df <- ddply(argentina, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'argentina-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Argentina",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Brazil}
+<<'Brazil',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Brazil by Visa Type">>=
+brazil <- subset(ammedtb, COB =="Brazil", drop=TRUE) 
+brazil$COB <- factor(brazil$COB)
+brazil$visacat.yecai <- factor(brazil$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=brazil)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'brazil-collapse'>>=
+df <- ddply(brazil, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'brazil-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Brazil",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Colombia}
+<<'Colombia',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Colombia by Visa Type">>=
+colombia <- subset(ammedtb, COB =="Colombia", drop=TRUE) 
+colombia$COB <- factor(colombia$COB)
+colombia$visacat.yecai <- factor(colombia$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=colombia)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'colombia-collapse'>>=
+df <- ddply(colombia, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'colombia-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Colombia",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{El Salvador}
+<<'elsalvador',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from El Salvador by Visa Type">>=
+elsalvador <- subset(ammedtb, COB =="El Salvador", drop=TRUE) 
+elsalvador$COB <- factor(elsalvador$COB)
+elsalvador$visacat.yecai <- factor(elsalvador$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=elsalvador)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'elsal-collapse'>>=
+df <- ddply(elsalvador, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'elsal-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from El Salvador",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Guatemala}
+<<'Guatemala',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Guatemala by Visa Type">>=
+guatemala <- subset(ammedtb, COB =="Guatemala", drop=TRUE) 
+guatemala$COB <- factor(guatemala$COB)
+guatemala$visacat.yecai <- factor(guatemala$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=guatemala)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'guatemala-collapse'>>=
+df <- ddply(guatemala, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Guatemala-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Guatemala",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Mexico}
+<<'Mexico',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Mexico by Visa Type">>=
+mexico <- subset(ammedtb, COB =="Mexico", drop=TRUE) 
+mexico$COB <- factor(mexico$COB)
+mexico$visacat.yecai <- factor(mexico$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=mexico)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'mexico-collapse'>>=
+df <- ddply(mexico, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Mexico-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Mexico",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\subsection{Venezuela}
+<<'Venezuela',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Venezuela by Visa Type">>=
+venezuela <- subset(ammedtb, COB =="Venezuela", drop=TRUE) 
+venezuela$COB <- factor(venezuela$COB)
+venezuela$visacat.yecai <- factor(venezuela$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=venezuela)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'venezuela-collapse'>>=
+df <- ddply(venezuela, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'Venezuela-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Venezuela",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+\newpage
+\section{Low TB incidence, North, Central and South American countries}
+\subsection{Canada}
+<<'Canada',fig.width=10,warning=FALSE,fig.cap="Time to status adjustment in non-immigrant applicants from Canada by Visa Type">>=
+
+#Canada
+canada <- subset(amlowtb, COB =="Canada", drop=TRUE) 
+canada$COB <- factor(canada$COB)
+canada$visacat.yecai <- factor(canada$visacat.yecai)
+
+##Strata - by visa types
+t.survfit <- survfit(Surv(texamyr, status)~visacat.yecai, data=canada)
+t.survfit$cumevent <- 1- t.survfit$surv # to create cumulative frequency variable (1-surv)
+t.survframe <- createSurvivalFrame(t.survfit)
+ 
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(legend.justification=c(1,0), legend.position=c(1,0))
+
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'canada-collapse'>>=
+df <- ddply(canada, .(visacat.yecai), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- subset(df, visacat.yecai!="NA", drop=TRUE)
+df <- rename(df, c(visacat.yecai="Visa type (Yecai's classification)", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'canada-table'>>=
+x.rescale <- xtable(df,label='tabrescaled',caption="Time to status adjustment for applicants from Canada",digits=c(0,0,0,2,2,2,2,2))
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+
+\end{document}

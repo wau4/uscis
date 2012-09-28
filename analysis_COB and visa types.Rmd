@@ -13,20 +13,12 @@ Key questions addressed in this analysis:
 2. What non-immigrant visa types fo these applicants enter the US on?
 3. How long are the non-immigrants staying in the US before adjusting their status?  The dataset from USCIS does not contain dates on the civil surgeon exam which happens approximately 1 year before or after application for status adjustment is filed.  Therefore, the application date in the USCIS dataset has been used as a proxy for the civil surgeon exam.
 
-```{r options, echo=FALSE}
-# Set options for report
-opts_chunk$set(comment = NA)
-opts_chunk$set(echo = FALSE)
-opts_chunk$set(message = FALSE)
-```
-
 Dataset being used for this is ni.main
-```{r "dataset",cache=TRUE}
+```{r "dataset"}
 load("~/Analyses/uscis data/uscis/uscis/ni.main.Rda")
 str(ni.main)
 ```
 
-#Summary of time to exam (variable - texamyr)
 
 ```{r "summary"}
 summary(ni.main$texamyr)
@@ -40,7 +32,7 @@ qplot(texamyr, data=ni.main, geom = "histogram", binwidth=0.1, xlim=c(0,20)) +
 
 *1a. By WHO defined TB regions (TB incidence rate of <20, 20-100, >100/100,000)
 
-``` {r "country of birth",cache=TRUE}
+``` {r "country of birth"}
 #Most common countries - this list was generated in the datasets2 code 
 #includes countries with >20,000 individuals per country in the uscis dataset
 
@@ -50,8 +42,7 @@ keepvars <- names(aggdata) %in% c("Group.1", "Group.2", "COB")
 aggdata <- aggdata[keepvars]
 ###Rename variables
 require(reshape)
-aggdata <- rename(aggdata, c(Group.1="cob", Group.2="tbburden", COB="Number"))
-aggdata <- aggdata[order(-aggdata$Number),]
+aggdata <- rename(aggdata, c(Group.1="cob", Group.2="tbburden", COB="Freq"))
 list(aggdata)
 ```
 
@@ -63,10 +54,10 @@ require(ggplot2)
 require(scales)
 
 ###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
-cob_order <- transform(aggdata, cob=reorder(cob, Number)) #Countries appreas from low to high frequency
+cob_order <- transform(aggdata, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
 
 #this plot will contain cob on x-axis
-p <- ggplot(data=cob_order, aes(x=cob, y=Number)) + geom_bar(colour="grey", width=.8) + 
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
   xlab("Country of birth") + ylab("Frequency") + opts(title="Country of birth of non-immigrant applicants for status adjustment")
 
 #this plot will flip the axes and show cob on y-axis (easier to read)
@@ -86,7 +77,7 @@ p + geom_bar() + theme_bw() + coord_flip() +
 
 *1d. By Yecai defined TB regions (TB incidence rate of <15, 15-100, >100/100,000)
 
-``` {r "Yecai TB classification", fig.height=5, fig.width=15, fig.align='center',cache=TRUE}
+``` {r "Yecai TB classification", fig.height=5, fig.width=15, fig.align='center'}
 #Aggregate over COB and tbburden.yecai
 aggdata.yecai <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden.yecai), FUN=length)
 keepvars <- names(aggdata.yecai) %in% c("Group.1", "Group.2", "COB")
@@ -116,7 +107,7 @@ p + geom_bar() + theme_bw() + coord_flip() +
 
 2. Most common visa types 
 
-```{r "visa types", fig.align='center',cache=TRUE}
+```{r "visa types", fig.align='center'}
 #Most common visa types
 require(ggplot2)
 require(reshape)
@@ -138,7 +129,7 @@ pvisatype + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=
 
 *2a. Visa categories defined by Yecai
 
-```{r "Yecai's visa categories", fig.height=5, fig.width=15, fig.align='center',cache=TRUE}
+```{r "Yecai's visa categories", fig.height=5, fig.width=15, fig.align='center'}
 ##Yecai's visatypes
 visacollapse.yecai <- as.data.frame(table(droplevels(ni.main)$visacat.yecai)) #This takes the table command and converts the output into a dataframe which can then be analyzed
 require(reshape)
