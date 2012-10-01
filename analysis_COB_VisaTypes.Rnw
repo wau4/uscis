@@ -50,15 +50,14 @@ df <- df[order(-df$Number),]
 @
 
 <<'INS status table'>>=
-print(xtable(df, caption="INS statuses in the non-immigrant dataset"), include.rownames=FALSE)
+print(xtable(df, caption="INS statuses in the non-immigrant dataset", digits=c(0,0,0,2)), include.rownames=FALSE)
 @
 
-\section{Further modification and descriptio of the non-immigrant dataset}
-\subsection{Countries of birth and geographical regions}
+\section{Countries of birth and geographical regions}
 <<'count country of birth'>>=
 cobcount <- as.data.frame(table(ni$COB))
 @
-There are \Sexpr{nrow(ni)} countries represented in the non-immigrants dataset (countries entered with name variations).  
+There are \Sexpr{nrow(cobcount)} countries represented in the non-immigrants dataset (countries entered with name variations).  
 
 
 <<'COB and regions'>>=
@@ -143,7 +142,7 @@ levels(ni.main$COB)[levels(ni.main$COB)=="KENYA"] <- "Kenya"
 #Generating regions
 ni.main <- within(ni.main, {
   region <- NA
-  region[COB=="China" | COB=="India" | COB=="Philippines" | COB=="S Korea" | COB=="Pakistan" | COB=="Vietnam" | COB=="Japan" | COB=="Taiwan" | COB=="Thailand" | COB=="Iran"] <- "Asia"
+  region[COB=="China" | COB=="India" | COB=="Philippines" | COB=="S Korea" | COB=="Pakistan" | COB=="Viet Nam" | COB=="Japan" | COB=="Taiwan" | COB=="Thailand" | COB=="Iran"] <- "Asia"
   region[COB=="Mexico" | COB=="Colombia" | COB=="Brazil" | COB=="Peru" | COB=="Venezuela" | COB=="El Salvador" | COB=="Guatemala" | COB=="Ecuador" | COB=="Argentina" | COB=="Honduras" | COB=="Canada"] <- "Americas"
   region[COB=="UK" | COB=="Poland" | COB=="Germany" | COB=="Ukraine" | COB=="Israel" | COB=="Russia" | COB=="Romania" | COB=="France"] <- "Europe"
   region[COB=="Nigeria" | COB=="Ethiopia" | COB=="Ghana" | COB=="Kenya"] <- "Africa"
@@ -160,13 +159,21 @@ collapse1 <- rename(collapse2, c(region="Region", COB="Country of birth", COB.le
 
 Table 2 presents a list of countries with $\geq$20,000 status adjustment applicants between 1999-2011, by geographical region.  
 <<'Regions and country of birth-table'>>=
-print(xtable(collapse1, caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status"), include.rownames=FALSE)
+x.rescale <- xtable(collapse1,label='tabrescaled',caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status")
+print(x.rescale, scalebox=.8, include.rownames=FALSE)
 @
 \FloatBarrier
 
 \newpage
-Graphical representation of Table 3...
-<<'countries of birth-plot',fig.height=6, fig.width=8, fig.align='center',fig.caption="Country of birth of non-immigrant applicants for status adjustment">>=
+Graphical representation of Table 2...
+<<'countries of birth-plot',fig.height=6, fig.width=8, fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment">>=
+#Aggregate over COB (country of birth) and tbburden (3 categories of TB incidence (<20, 20-100, >100/100,000) )
+aggdata <- aggregate(ni.main, by=list(ni.main$COB), FUN=length)
+keepvars <- names(aggdata) %in% c("Group.1", "Group.2", "COB")
+aggdata <- aggdata[keepvars]
+###Rename variables
+require(reshape)
+aggdata <- rename(aggdata, c(Group.1="cob", COB="Freq"))
 #Plotting bargraphs
 require(ggplot2)
 require(scales)
@@ -183,13 +190,14 @@ p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(20000,
 @
 \FloatBarrier
 
+\newpage
 \section{Visa types}
 <<'count non-immigrant visa types'>>=
 visacount <- as.data.frame(table(droplevels(ni.main$visatype)))
 visacount$Var1 <- as.factor(visacount$Var1)
 @
 
-Of the total \Sexpr{nlevels(visacount$Var1)} non-immigrant visa types represented in this dataset, a list of visatypes with $\geq$26,500 applicants for status adjustment between 1999-2011 is shown in Table 4.
+Of the total \Sexpr{nlevels(visacount$Var1)} non-immigrant visa types represented in this dataset, a list of visatypes with $\geq$26,500 applicants for status adjustment between 1999-2011 is shown in Table 3.
 
 <<'Visa types'>>=
 #Most common visa types
@@ -223,10 +231,38 @@ visacat <- rename(visacat, c(Var1="Visa type", Freq="Number"))
 visacat$Percent <- 100* visacat$Number/sum(visacat$Number)
 @
 
+<<'Visa type table'>>=
+print(xtable(visacat, caption="Visa types with >=26,500 status adjusters between 1999-2011", digits=c(0,0,0,2)), include.rownames=FALSE)
+@
 
+And the same is represented graphically in Figure 2...
 
+<<'visa types', fig.align='center',fig.height=4,fig.width=8,fig.cap="Visa types of non-immigrant applicants for status adjustment">>=
+#Most common visa types
+require(ggplot2)
+require(reshape)
+library(scales)
+visacollapse <- as.data.frame(table(droplevels(ni.main)$visacat)) #This takes the table command and converts the output into a dataframe which can then be analyzed
+visacollapse <- visacollapse[order(-visacollapse$Freq),] #order the freq of visatypes from high to low
+visacollapse <- rename(visacollapse, c(Var1="visa"))
 
-<<'Yecai's visa classification'>>=
+###Pre-graphing code for ordering the visa types by frequency and not their numeric code 
+visacollapse_reorder <- transform(visacollapse, visa=reorder(visa, Freq)) #makes graph appear with visa types from low to high freq
+
+###This keep the visa type on the x-axis
+pvisatype <- ggplot(data=visacollapse_reorder, aes(x=visa, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Visa Type") + ylab("Frequency") 
+
+###This flips the coordinates (coord_flip) 
+pvisatype + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(25000, 100000, 200000, 300000, 400000, 500000, 600000, 700000))
+@
+\FloatBarrier
+
+\newpage
+\subsection{Yecai's visa classification}
+The non-immigrant visa types were further categorized by broad definitions developed by Yecai for his PLoS One paper.  Table 4 shows this applicants according to this classification.
+
+<<'Yecai visa classification'>>=
 #Recategorize visa types - using Yecai's classification
 
 ni.main <- within(ni.main, {
@@ -253,6 +289,142 @@ levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="2"] <- "Tourists a
 levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="3"] <- "Diplomats and families"
 levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="4"] <- "Asylees and parolees"
 levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="5"] <- "Entry without inspection"
+
+visacat.yecai <- as.data.frame(table(droplevels(ni.main$visacat.yecai)))
+visacat.yecai <- visacat.yecai[order(-visacat.yecai$Freq),]
+visacat.yecai <- rename(visacat.yecai, c(Var1="Visa type", Freq="Number"))
+visacat.yecai$Percent <- 100* visacat.yecai$Number/sum(visacat$Number)
+@
+
+<<'Yecai visa table'>>=
+print(xtable(visacat.yecai, caption="Status adjustment applicants based on Yecai's visa classification", digits=c(0,0,0,2)), include.rownames=FALSE)
+@
+
+And graphically...
+<<'Yecai visa categories', fig.height=6, fig.width=15, fig.align='center',fig.cap="Non-immigrant applicants for status adjustment, by Yecai's visa classification">>=
+##Yecai's visatypes
+visacollapse.yecai <- as.data.frame(table(droplevels(ni.main)$visacat.yecai)) #This takes the table command and converts the output into a dataframe which can then be analyzed
+require(reshape)
+visacollapse.yecai <- rename(visacollapse.yecai, c(Var1="visa"))
+
+###Pre-graphing code for ordering the visa types by frequency and not their numeric code 
+visacollapse.yecai_reorder <- transform(visacollapse.yecai, visa=reorder(visa, Freq)) #makes graph appear with visa types from low to high freq
+
+###This keep the visa type on the x-axis
+require(ggplot2)
+pvisatype <- ggplot(data=visacollapse.yecai_reorder, aes(x=visa, y=Freq)) + geom_bar(colour="grey", width=.3) + 
+  xlab("Visa Type") + ylab("Frequency") 
+
+###This flips the coordinates (coord_flip) 
+require(scales)
+pvisatype + geom_bar(colour="grey", width=.5) + coord_flip() + scale_y_continuous(labels=comma, breaks=c(25000, 100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000))
+@
+
+\newpage
+\section{TB classification}
+Using WHO's TB incidence data over the last 20 years, we classified countries into high TB incidence ($>$100/100,000), medium TB incidence (20-100/100,000) and low TB incidence ($<$20/100,000).  Table 5 presents the number of status adjustment applicants by their country of birth, geographical region and WHO TB burden of their birth country.
+
+<<'TB classification'>>=
+#create a variable for TB burden using WHO classification and Yecai's classification
+#WHO classification
+#This classification was derived from WHO data in TB incidence rate/100,000 (see the tbwho.Rmd document)
+ni.main <- within(ni.main, {
+  tbburden <- NA
+  tbburden[COB=="Canada" | COB=="Cuba" | COB=="France" | COB=="Germany" | COB=="Israel" | COB=="Jamaica" | COB=="UK" | COB=="Trinidad"] <- "low (TB incidence<20/100,000)"
+  tbburden[COB=="Argentina" | COB=="Brazil" | COB=="Colombia" | COB=="El Salvador" | COB=="Guatemala" | COB=="Japan" | COB=="Mexico" | COB=="Poland"
+           | COB=="S Korea" | COB=="Ukraine" | COB=="Venezuela" | COB=="Iran"] <- "medium (TB incidence 20-100/100,000)"
+  tbburden[COB=="China" | COB=="India" | COB=="Philippines" 
+           | COB=="Haiti" | COB=="Peru" | COB=="Dom Republic"
+           | COB=="Pakistan" | COB=="Viet Nam" | COB=="Ecuador"
+           | COB=="Nigeria" | COB=="Ethiopia" | COB=="Russia" | COB=="Ghana" | COB=="Thailand"
+           | COB=="Romania" | COB=="Honduras" | COB=="Kenya"] <- "high (TB incidence>100/100,000)"
+})
+ni.main$tbburden <- factor(ni.main$tbburden, c("high (TB incidence>100/100,000)", "medium (TB incidence 20-100/100,000)", "low (TB incidence<20/100,000)"), levels=c("high (TB incidence>100/100,000)", "medium (TB incidence 20-100/100,000)", "low (TB incidence<20/100,000)"))
+@
+
+<<'Yecai TB classification'>>=
+#this was taken from Liu, Y. PLoS One 2012
+ni.main <- within(ni.main, {
+  tbburden.yecai <- NA
+  tbburden.yecai[COB=="Canada" | COB=="Cuba" | COB=="France" | COB=="Germany" | COB=="Israel" | COB=="Jamaica" | COB=="UK"] <- "low (TB incidence<14/100,000)"
+  tbburden.yecai[COB=="Argentina" | COB=="Brazil" | COB=="Colombia" | COB=="El Salvador" | COB=="Guatemala" | COB=="Japan" | COB=="Mexico" | COB=="Poland"
+                 | COB=="S Korea" | COB=="Ukraine" | COB=="Venezuela" | COB=="Iran" | COB=="Trinidad"] <- "medium (TB incidence 15-99/100,000)"
+  tbburden.yecai[COB=="China" | COB=="India" | COB=="Philippines" 
+                 | COB=="Haiti" | COB=="Peru" | COB=="Dom Republic"
+                 | COB=="Pakistan" | COB=="Vietnam" | COB=="Ecuador"
+                 | COB=="Nigeria" | COB=="Ethiopia" | COB=="Russia" | COB=="Ghana" | COB=="Thailand"
+                 | COB=="Romania" | COB=="Honduras" | COB=="Kenya"] <- "high (TB incidence>100/100,000)"
+})
+
+ni.main$tbburden.yecai <- factor(ni.main$tbburden.yecai, c("high (TB incidence>100/100,000)", "medium (TB incidence 15-99/100,000)", "low (TB incidence<14/100,000)"), levels=c("high (TB incidence>100/100,000)", "medium (TB incidence 15-99/100,000)", "low (TB incidence<14/100,000)"))
+@
+
+<<'TB burden collapse'>>=
+collapse2 <- summaryBy(COB ~ tbburden + region + COB, FUN=length, data=ni.main)
+@
+
+<<'TB burden table'>>=
+print(xtable(collapse2, caption="Number of status adjustment applicants by TB burden, region and country of birth"), include.rownames=FALSE)
+@
+
+\newpage
+Figure 4 shows the number of status adjustment applicants by their country of birth, stratified by TB burden.
+<<'COB and TB burden',fig.height=6,fig.width=15,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden">>=
+require(ggplot2)
+library(scales)
+#Aggregate over COB and tbburden
+aggdata <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden), FUN=length)
+keepvars <- names(aggdata) %in% c("Group.1", "Group.2", "COB")
+aggdata <- aggdata[keepvars]
+###Rename variables
+require(reshape)
+aggdata <- rename(aggdata, c(Group.1="cob", Group.2="tbburden", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") 
+
+#this plot will flip the axes and show cob on y-axis (easier to read)
+#p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, limits=c(0,600000)) #this gives range of y axis (0 - 600000)
+#p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000))
+
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden, ncol=3, scales="free") 
+@
+\FloatBarrier
+
+\newpage
+\subsection{Yecai's TB classification}
+In addition to the WHO TB classification, we used the classification developed by Yecai for his PLoS One paper, as follows: high TB incidence ($>$100/100,000), medium TB incidence (15-100/100,000) and low TB incidence ($<$15/100,000).  Figure 5 shows the countries of birth of status adjusters according to Yecai's TB classification.  
+<<'COB and Yecai TB burden',fig.height=6,fig.width=15,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden (Yecai classification)">>=
+library(ggplot2)
+library(scales)
+#Aggregate over COB and tbburden.yecai
+aggdata.yecai <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden.yecai), FUN=length)
+keepvars <- names(aggdata.yecai) %in% c("Group.1", "Group.2", "COB")
+aggdata.yecai <- aggdata.yecai[keepvars]
+###Rename variables
+require(reshape)
+aggdata.yecai <- rename(aggdata.yecai, c(Group.1="cob", Group.2="tbburden.yecai", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.yecai, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") 
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden.yecai, ncol=3)
+
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden.yecai, ncol=3, scales="free") 
+@
+
+<<'save data'>>=
+ni.main$status <- 1
+save(ni.main, file="ni.main.Rda")
 @
 
 \end{document}
