@@ -128,34 +128,34 @@ The total number of records is the USCIS dataset is \Sexpr{nrow(uscis)} and the 
 
 <<'INS status'>>=
 uscis <- within(uscis, {
-  status <- NA
-  status[INSCurrentStatus=="RE"] <- "1"
-  status[INSCurrentStatus=="PR"] <- "2"
-  status[INSCurrentStatus=="AS"] <- "3"
-  status[INSCurrentStatus!="RE" & INSCurrentStatus!="AS" & INSCurrentStatus!="PR"] <- "4"
+  insstatus <- NA
+  insstatus[INSCurrentStatus=="RE"] <- "1"
+  insstatus[INSCurrentStatus=="PR"] <- "2"
+  insstatus[INSCurrentStatus=="AS"] <- "3"
+  insstatus[INSCurrentStatus!="RE" & INSCurrentStatus!="AS" & INSCurrentStatus!="PR"] <- "4"
   })
-uscis$status <- as.factor(uscis$status)
+uscis$insstatus <- as.factor(uscis$insstatus)
 #Value labels
 uscis <- uscis
-levels(uscis$status)[levels(uscis$status)=="1"] <- "Refugees"
-levels(uscis$status)[levels(uscis$status)=="2"] <- "Parolees"
-levels(uscis$status)[levels(uscis$status)=="3"] <- "Asylees"
-levels(uscis$status)[levels(uscis$status)=="4"] <- "Non-immigrants"
+levels(uscis$insstatus)[levels(uscis$insstatus)=="1"] <- "Refugees"
+levels(uscis$insstatus)[levels(uscis$insstatus)=="2"] <- "Parolees"
+levels(uscis$insstatus)[levels(uscis$insstatus)=="3"] <- "Asylees"
+levels(uscis$insstatus)[levels(uscis$insstatus)=="4"] <- "Non-immigrants"
 require(plyr)
 require(xtable)
-df <- ddply(uscis, .(status), function(x) c(count=nrow(x)))
-df <- rename(df, c(status="Status", count="Number"))
+df <- ddply(uscis, .(insstatus), function(x) c(count=nrow(x)))
+df <- rename(df, c(insstatus="Immigration Status", count="Number"))
 df$percent <- 100* df$Number/sum(df$Number)
 df <- df[order(-df$Number),]
 uscis <- rename(uscis, c(INSCurrentStatus="visatype"))
 @
 
 <<'INS status table'>>=
-print(xtable(df, caption="INS statuses in the USCIS dataset"), include.rownames=FALSE)
+print(xtable(df, caption="Immigration statuses in the USCIS dataset"), include.rownames=FALSE)
 @
 
 <<'count visatypes'>>=
-uscis.ni <- subset(uscis, status=="Non-immigrants", drop=TRUE) 
+uscis.ni <- subset(uscis, insstatus=="Non-immigrants", drop=TRUE) 
 visacount <- as.data.frame(table(droplevels(uscis.ni$visatype)))
 visacount$Var1 <- as.factor(visacount$Var1)
 @
@@ -173,7 +173,7 @@ uscis$year <- format(uscis$ApprovedDate1, "%Y")
 <<'Annual number of applicants',fig.width=8,fig.height=4,fig.cap="Annual number of applicants for status adjustment">>=
 require(ggplot2)
 require(scales)
-ggplot(data=uscis, aes(x=year)) + geom_bar(aes(fill=status), position="dodge") +
+ggplot(data=uscis, aes(x=year)) + geom_bar(aes(fill=insstatus), position="dodge") +
   xlab("Year of application for status adjustment") + scale_y_continuous(labels=comma,"Number") + 
   opts(legend.justification=c(0,1), legend.position=c(0,1))
 @
@@ -183,12 +183,12 @@ ggplot(data=uscis, aes(x=year)) + geom_bar(aes(fill=status), position="dodge") +
 The cumulative number of status adjustments between 1991 to 2011 are shown in Figure 2, by immigration status.
 
 <<'calculate last.point and cumulative sum'>>=
-keepvars <- names(uscis) %in% c("status", "year")
+keepvars <- names(uscis) %in% c("insstatus", "year")
 uscis2 <- uscis[keepvars]
 
-aggdata <- aggregate(uscis2, by=list(uscis2$status, uscis2$year), FUN=length) 
+aggdata <- aggregate(uscis2, by=list(uscis2$insstatus, uscis2$year), FUN=length) 
 aggdata <- aggdata[c(1,2,3)] 
-aggdata <- rename(aggdata, c(Group.1="status", Group.2="year", status="count")) #Rename Group.1 as COB
+aggdata <- rename(aggdata, c(Group.1="status", Group.2="year", insstatus="count")) 
 
 require(plyr)
 status.sum = ddply(aggdata, .(status), summarize, year=I(year), total=cumsum(count))
