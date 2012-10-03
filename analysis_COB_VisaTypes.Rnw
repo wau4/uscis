@@ -43,14 +43,14 @@ The non-immigrant dataset after going though data cleaning and after excluding r
 <<'INS status - collapse'>>=
 require(plyr)
 require(xtable)
-df <- ddply(ni, .(status), function(x) c(count=nrow(x)))
-df <- rename(df, c(status="Status", count="Number"))
+df <- ddply(ni, .(insstatus), function(x) c(count=nrow(x)))
+df <- rename(df, c(insstatus="Immigration Status", count="Number"))
 df$Percent <- 100* df$Number/sum(df$Number)
 df <- df[order(-df$Number),]
 @
 
 <<'INS status table'>>=
-print(xtable(df, caption="INS statuses in the non-immigrant dataset", digits=c(0,0,0,2)), include.rownames=FALSE)
+print(xtable(df, caption="Immigration statuses in the non-immigrant dataset", digits=c(0,0,0,2)), include.rownames=FALSE)
 @
 
 \section{Countries of birth and geographical regions}
@@ -74,14 +74,14 @@ cobfreq1 <- subset(cobfreq, Freq > 20000, select=c(Var1, Freq))
 ##fixing country names
 ni$COB[ni$COB == "KOREA"] <- "SKORE" #replacing Korea with skore (i.e. skorea)
 ni$COB[ni$COB == "USSR"] <- "RUSSI" #replacing USSR with Russi (i.e. Russia)
-
+ni$COB[ni$COB == "TAIWA"] <- "CHINA" #Counting Taiwan in China
 #Recategorizing COB in the ni dataframe to classify countries with <20000 applicants as NA, which will be excluded in the next step 
 ni <- within(ni, {
   cobcat <- as.factor(ni$COB)
   cobcat[COB!="MEXIC" & COB!="CHINA" & COB!="INDIA" & COB!="CUBA" & COB!="PHILI" & COB!="COLOM" & COB!="SKORE" 
          & COB!="CANAD" & COB!="BRAZI" & COB!="HAITI" & COB!="PERU" & COB!="UK" & COB!="JAMAI" & COB!="DR"
          & COB!="VENEZ" & COB!="PAKIS" & COB!="ELSAL" & COB!="VIETN" & COB!="POLAN" & COB!="GUATE" & COB!="ECUAD"
-         & COB!="ARGEN" & COB!="GERMA" & COB!="UKRAI" & COB!="NIGIA" & COB!="JAPAN" & COB!="TAIWA"
+         & COB!="ARGEN" & COB!="GERMA" & COB!="UKRAI" & COB!="NIGIA" & COB!="JAPAN" 
          & COB!="TRINI" & COB!="ETHIO" & COB!="ISRAE" & COB!="RUSSI" & COB!="GHANA" & COB!="THAIL" & COB!="IRAN"
          & COB!="ROMAN" & COB!="HONDU" & COB!="FRANC" & COB!="KENYA"] <- NA
 })
@@ -126,7 +126,6 @@ levels(ni.main$COB)[levels(ni.main$COB)=="GERMA"] <- "Germany"
 levels(ni.main$COB)[levels(ni.main$COB)=="UKRAI"] <- "Ukraine"
 levels(ni.main$COB)[levels(ni.main$COB)=="NIGIA"] <- "Nigeria"
 levels(ni.main$COB)[levels(ni.main$COB)=="JAPAN"] <- "Japan"
-levels(ni.main$COB)[levels(ni.main$COB)=="TAIWA"] <- "Taiwan"
 levels(ni.main$COB)[levels(ni.main$COB)=="TRINI"] <- "Trinidad"
 levels(ni.main$COB)[levels(ni.main$COB)=="ETHIO"] <- "Ethiopia"
 levels(ni.main$COB)[levels(ni.main$COB)=="ISRAE"] <- "Israel"
@@ -155,11 +154,16 @@ require(doBy)
 collapse2 <- summaryBy(COB ~ region + COB, FUN=length, data=ni.main)
 require(reshape)
 collapse1 <- rename(collapse2, c(region="Region", COB="Country of birth", COB.length="Number"))
+collapse1$Percent <- 100* collapse1$Number/sum(collapse1$Number)
+collapse1 <- collapse1[order(-collapse1$Number),]
+collapse1$cumsum <- cumsum(collapse1$Number)
+collapse1$cumPercent <- 100* collapse1$cumsum/sum(collapse1$Number)
+collapse1 <- rename(collapse1, c(cumsum="Cumumative total", cumPercent="Cumulative percent"))
 @
 
 Table 2 presents a list of countries with $\geq$20,000 status adjustment applicants between 1999-2011, by geographical region.  
 <<'Regions and country of birth-table'>>=
-x.rescale <- xtable(collapse1,label='tabrescaled',caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status")
+x.rescale <- xtable(collapse1,label='tabrescaled',caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status", digits=c(0,0,0,0,2,0,2))
 print(x.rescale, scalebox=.8, include.rownames=FALSE)
 @
 \FloatBarrier
@@ -360,10 +364,21 @@ ni.main$tbburden.yecai <- factor(ni.main$tbburden.yecai, c("high (TB incidence>1
 @
 
 <<'TB burden collapse'>>=
-collapse2 <- summaryBy(COB ~ tbburden + region + COB, FUN=length, data=ni.main)
+collapse2 <- summaryBy(COB ~ tbburden, FUN=length, data=ni.main)
+require(reshape)
+collapse2 <- rename(collapse2, c(tbburden="TB burden", COB.length="Number"))
+collapse2$Percent <- 100* collapse2$Number/sum(collapse2$Number)
+collapse2 <- collapse2[order(-collapse2$Number),]
+collapse2$cumsum <- cumsum(collapse2$Number)
+collapse2$cumPercent <- 100* collapse2$cumsum/sum(collapse2$Number)
 @
 
-<<'TB burden table'>>=
+<<'TB burden details collapse'>>=
+collapse2 <- summaryBy(COB ~ tbburden + region + COB, FUN=length, data=ni.main)
+collapse2 <- rename(collapse2, c(tbburden="TB burden", region="Region", COB="Country of birth", COB.length="Number"))
+@
+
+<<'TB burden details table'>>=
 print(xtable(collapse2, caption="Number of status adjustment applicants by TB burden, region and country of birth"), include.rownames=FALSE)
 @
 
@@ -413,9 +428,6 @@ cob_order <- transform(aggdata.yecai, cob=reorder(cob, Freq)) #Countries appreas
 #this plot will contain cob on x-axis
 p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
   xlab("Country of birth") + ylab("Frequency") 
-p + geom_bar() + theme_bw() + coord_flip() +
-  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
-  facet_wrap(~ tbburden.yecai, ncol=3)
 
 p + geom_bar() + theme_bw() + coord_flip() +
   scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
