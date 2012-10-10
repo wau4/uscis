@@ -356,6 +356,34 @@ p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed")
 @
 \FloatBarrier
 
+<<'TB burden-summary'>>=
+require(Hmisc)
+describe(ni.main$texamyr)
+@
+
+Figure 2 shows time to status adjustment by high, medium and low TB burden countries.
+<<'time to status adjustment-by tb burden', fig.height=6,fig.width=8,warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants">>=
+#Survival frame
+t.survfit <- survfit(Surv(texamyr, status)~tbburden, data=ni.main)
+t.survfit$cumevent <- 1-t.survfit$surv
+t.survframe <- createSurvivalFrame(t.survfit)
+colour <- c("red", "blue", "green")
+p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability of adjusting status") + opts(title="Time to status adjustment among applicants from \nhigh (blue), medium (green) and low (red) TB incidence countries") 
+#false option next to t.survframe is to suppress the CIs.
+p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + theme_bw() + opts(legend.position="none") 
+@
+\FloatBarrier
+
+<<'TB burden-collapse'>>=
+df <- ddply(ni.main, .(tbburden), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
+df <- rename(df, c(tbburden="TB burden", count="Number", mean="Mean time to exam", max="Max.time to exam"))
+df <- df[order(-df$Number),]
+@
+
+<<'TB burden-table'>>=
+print(xtable(df, caption="Time to status adjustment for applicants from high, medium and low TB burden countries",digits=c(0,0,0,2,2,2,2,2)), include.rownames=FALSE)
+@
+
 %Time to status adjustment by country of birth
 
 <<'time to status adjustment-by country of birth',warning=FALSE,eval=FALSE>>=
@@ -389,6 +417,17 @@ yref=data.frame(yval=c(0.5, 0.8))
 p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
 @
 
+<<'high TB regions-collapse'>>=
+df <- ddply(hightb, .(region), function(x) c(count=nrow(x)))
+df <- rename(df, c(region="Region", count="Number"))
+df <- df[order(-df$Number),]
+df$Percent <- 100* df$Number/sum(df$Number)
+@
+
+<<'High TB incidence regions-table'>>=
+print(xtable(df, caption="Status adjustment applicants from high WHO TB incidence regions",digits=c(0,0,0,2)), include.rownames=FALSE)
+@
+
 <<'high TB COB-collapse'>>=
 df <- ddply(hightb, .(COB), function(x) c(count=nrow(x), mean=mean(x$texamyr), max=max(x$texamyr), quantile=quantile(x$texamyr, seq(.25, .75, by=.25))))
 df <- rename(df, c(COB="Country of birth", count="Number", mean="Mean time to exam", max="Max.time to exam"))
@@ -414,6 +453,17 @@ p <- qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("C
 xref=data.frame(xval=c(2.5, 5))
 yref=data.frame(yval=c(0.5, 0.8))
 p + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20))
+@
+
+<<'medium TB regions-collapse'>>=
+df <- ddply(mediumtb, .(region), function(x) c(count=nrow(x)))
+df <- rename(df, c(region="Region", count="Number"))
+df <- df[order(-df$Number),]
+df$Percent <- 100* df$Number/sum(df$Number)
+@
+
+<<'medium TB incidence regions-table'>>=
+print(xtable(df, caption="Status adjustment applicants from high WHO TB incidence regions",digits=c(0,0,0,2)), include.rownames=FALSE)
 @
 
 <<'medium TB COB-collapse'>>=
