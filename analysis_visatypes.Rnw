@@ -1,0 +1,99 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+\usepackage{rotating}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE)
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+@
+
+<<'load data',cache=TRUE>>=
+load("C:/Users/wau4/Desktop/uscis/uscis/ni.main.Rda")
+@
+
+<<'nonimmigrants',cache=TRUE>>=
+nonimmigrants <- subset(ni.main, insstatus=="Non-immigrants", drop=TRUE)
+nonimmigrants$insstatus <- factor(nonimmigrants$insstatus)
+df.ni <- ddply(nonimmigrants, .(COB), function(x) c(count=nrow(x)))
+df.ni <- rename(df.ni, c(COB="Birthcountry", count="Number"))
+df.ni$Percent <- 100* df.ni$Number/sum(df.ni$Number)
+df.ni <- df.ni[order(-df.ni$Number),]
+df.ni
+@
+
+<<'asylees',cache=TRUE>>=
+asylees <- subset(ni.main, insstatus=="Asylees", drop=TRUE)
+asylees$insstatus <- factor(asylees$insstatus)
+df.asylees <- ddply(asylees, .(COB), function(x) c(count=nrow(x)))
+df.asylees <- rename(df.asylees, c(COB="Birthcountry", count="Number"))
+df.asylees$Percent <- 100* df.asylees$Number/sum(df.asylees$Number)
+df.asylees <- df.asylees[order(-df.asylees$Number),]
+@
+
+<<'parolees',cache=TRUE>>=
+parolees <- subset(ni.main, insstatus=="Parolees", drop=TRUE)
+parolees$insstatus <- factor(parolees$insstatus)
+df.parolees <- ddply(parolees, .(COB), function(x) c(count=nrow(x)))
+df.parolees <- rename(df.parolees, c(COB="Birthcountry", count="Number"))
+df.parolees$Percent <- 100* df.parolees$Number/sum(df.parolees$Number)
+df.parolees <- df.parolees[order(-df.parolees$Number),]
+@
+
+<<'JOin',eval=FALSE>>=
+df.ni$status = "nonimmigrant"
+df.asylees$status = "asylees"
+df.parolees$status = "parolees"
+all = rbind(df.ni, df.asylees, df.parolees)
+@
+
+<<'immigration status'>>=
+library(xtable)
+ni.rank = df.ni[rev(order(df.ni$Number)),]
+ni.rank$BirthCountry = reorder(ni.rank$Birthcountry, -ni.rank$Number)
+ni.top = data.frame(BirthCountry = ni.rank$BirthCountry, 
+                    Number = ni.rank$Number, 
+                    Percent = ni.rank$Percent)
+
+asylees.rank = df.asylees[rev(order(df.asylees$Number)),]
+asylees.rank$BirthCountry = reorder(asylees.rank$Birthcountry, -asylees.rank$Number)
+asylees.top = data.frame(BirthCountry = asylees.rank$BirthCountry, 
+                    Number = asylees.rank$Number, 
+                    Percent = asylees.rank$Percent)
+
+parolees.rank = df.parolees[rev(order(df.parolees$Number)),]
+parolees.rank$BirthCountry = reorder(parolees.rank$Birthcountry, -parolees.rank$Number)
+parolees.top = data.frame(BirthCountry = parolees.rank$BirthCountry, 
+                    Number = parolees.rank$Number, 
+                    Percent = parolees.rank$Percent)
+
+top.status = cbind(ni.top[,], asylees.top[,], parolees.top[,])
+# print top 10
+# remove redundant ranks
+cols = c(1,2,3,4,6,7,8,10,11,12)  #identify colums to keep
+t = top.status[1:37, ]
+colnames(t) = c("Non-immigrants", "NI-COB", "NI-Percent", "Asylees", "Asy-COB", "Asy-Percent", "Parolees", "Par-COB", "Par-Percent")
+cols.comma = c(2,5,8)  # identify columns that need commas for thousands
+cols.dec = c(0,0,0,2,0,0,2,0,0,2)   # identify columns that need decimals
+t[, cols.comma] = prettyNum( t[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(t, caption = "Countries of Origin for non-immigrants, asylees and parolees, 1999-2011", digits=2 ,
+              align=c('l', 'r', 'r','r','r','r','r','r', 'r', 'r')),
+               floating.environment='sidewaystable', caption.placement='top')
+@
+
+\end{document}
