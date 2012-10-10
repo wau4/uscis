@@ -50,10 +50,10 @@ LPR applicants who entered the US as nonimmigrants (for example, students or wor
 
 Therefore, the civil surgeons exam on these individuals is potentially the only systematic information on the conditions of public health importance in this population, particularly TB.  Since the risk of TB among foreign-born individuals in the US is significantly associated with the duration of stay in the US, the timing of the Civil Surgeon exam is of importance.      
 
-Therefore, two key questions that would be important to address are:
+{\bf Therefore, two key questions that would be important to address are:}
 \begin{enumerate}
-\item What is the timing of the civil surgeon examination, a mandatory medical exam for application for status adjustment, since the time of entry into the US as a non-immigrant?
-\item What is the impact of this exam and it's timing on prevention of TB cases among foreign born individuals in the US?
+{\bf \item What is the timing of the civil surgeon examination, a mandatory medical exam for application for status adjustment, since the time of entry into the US as a non-immigrant?
+\item What is the impact of this exam and it's timing on prevention of TB cases among foreign born individuals in the US?}
 \end{enumerate}
 
 The medical forms from the Civil Surgeon exams are sent to USCIS by the applicant for status adjustment and are maintained in a paper form by the USCIS and not entered into a database.  Therefore, the civil surgeon exam data is not readily accessible for an analytic purpose.  However, a basic demographic form (I-485) that accompanies the application for status adjustment is entered into a database by USCIS but the date of the Civil Surgeon exam is not recorded in this form.  
@@ -233,5 +233,12 @@ ni <- subset(uscis, visatype!="RE", drop=TRUE)
 ni$visatype <- factor(ni$visatype)
 save(ni, file="ni.Rda")
 @
+
+\section{Limitations of the data}
+Limitations of this data include:
+\begin{enumerate}
+\item The data provided by USCIS contains only approved applicants.  Actual number of applicants who undergo medical examination is greater.
+\item Using the date of last entry into the US may under-estimate the time to status adjustment.  However, in the absence of the date of first arrival into the US, the best estimate of the time to status adjustment is provided by the date of last entry into the US.
+\item Mexico border crossing - compare with Canada.
 
 \end{document}
