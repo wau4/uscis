@@ -50,7 +50,7 @@ df <- df[order(-df$Number),]
 @
 
 <<'INS status table'>>=
-print(xtable(df, caption="Immigration statuses in the non-immigrant dataset", digits=c(0,0,0,2)), include.rownames=FALSE)
+print(xtable(df, caption="Immigration status of applicants for status adjustment between 1999-2011", digits=c(0,0,0,2)), include.rownames=FALSE)
 @
 
 \section{Countries of birth and geographical regions}
@@ -148,22 +148,65 @@ ni.main <- within(ni.main, {
   region[COB=="Cuba" | COB=="Haiti" | COB=="Jamaica" | COB=="Dom Republic" | COB=="Trinidad"] <- "Carribean"
 })
 #Note: Israel classified under Europe
+@
 
+%The following 4 chunks are for generating a table with number of applicants by COB, stratified by non-immigrants, asylee or parolee status.
+
+<<'COB collapse',cache=TRUE>>=
 #check if all countries have been assigned a region
 require(doBy)
 collapse2 <- summaryBy(COB ~ region + COB, FUN=length, data=ni.main)
 require(reshape)
-collapse1 <- rename(collapse2, c(region="Region", COB="Country of birth", COB.length="Number"))
+collapse1 <- rename(collapse2, c(region="Region", COB="BirthCountry", COB.length="Number"))
 collapse1$Percent <- 100* collapse1$Number/sum(collapse1$Number)
 collapse1 <- collapse1[order(-collapse1$Number),]
 collapse1$cumsum <- cumsum(collapse1$Number)
 collapse1$cumPercent <- 100* collapse1$cumsum/sum(collapse1$Number)
-collapse1 <- rename(collapse1, c(cumsum="Cumumative total", cumPercent="Cumulative percent"))
+collapse1 <- rename(collapse1, c(cumsum="Cumulative total", cumPercent="Cumulative percent"))
+@
+
+<<'nonimmigrants',cache=TRUE>>=
+nonimmigrants <- subset(ni.main, insstatus=="Non-immigrants", drop=TRUE)
+nonimmigrants$insstatus <- factor(nonimmigrants$insstatus)
+df.ni <- ddply(nonimmigrants, .(COB), function(x) c(count=nrow(x)))
+df.ni <- rename(df.ni, c(COB="BirthCountry", count="ni"))
+#df.ni$Percent <- 100* df.ni$Number/sum(df.ni$Number)
+#df.ni <- df.ni[order(-df.ni$Number),]
+@
+
+<<'asylees',cache=TRUE>>=
+asylees <- subset(ni.main, insstatus=="Asylees", drop=TRUE)
+asylees$insstatus <- factor(asylees$insstatus)
+df.asylees <- ddply(asylees, .(COB), function(x) c(count=nrow(x)))
+df.asylees <- rename(df.asylees, c(COB="BirthCountry", count="asylees"))
+#df.asylees$Percent <- 100* df.asylees$Number/sum(df.asylees$Number)
+#df.asylees <- df.asylees[order(-df.asylees$Number),]
+@
+
+<<'parolees',cache=TRUE>>=
+parolees <- subset(ni.main, insstatus=="Parolees", drop=TRUE)
+parolees$insstatus <- factor(parolees$insstatus)
+df.parolees <- ddply(parolees, .(COB), function(x) c(count=nrow(x)))
+df.parolees <- rename(df.parolees, c(COB="BirthCountry", count="parolees"))
+#df.parolees$Percent <- 100* df.parolees$Number/sum(df.parolees$Number)
+#df.parolees <- df.parolees[order(-df.parolees$Number),]
+@
+
+%Merging the above 4 data.frames
+
+<<'immigration status2'>>=
+total <- merge(collapse1, df.ni, by="BirthCountry")
+total2 <- merge(total, df.asylees, by="BirthCountry")
+total3 <- merge(total2, df.parolees, by="BirthCountry")
+total3 <- total3[order(-total3$Number),]
+total3 <- rename(total3, c(ni="Non-immigrants", asylees="Asylees", parolees="Parolees"))
 @
 
 Table 2 presents a list of countries with $\geq$20,000 status adjustment applicants between 1999-2011, by geographical region.  
 <<'Regions and country of birth-table'>>=
-x.rescale <- xtable(collapse1,label='tabrescaled',caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status", digits=c(0,0,0,0,2,0,2))
+cols.comma = c(3,5,7,8,9)  # identify columns that need commas for thousands
+total3[, cols.comma] = prettyNum( total3[, cols.comma], big.mark=",", drop0trailing = TRUE)
+x.rescale <- xtable(total3,label='tabrescaled',caption="Countries of birth with 20,000 or more status adjusters between 1999-2011, by geographical region. The number of status adjusters has been stratified by immigration status", digits=c(0,0,0,0,2,0,2,0,0,0), align=c('l', 'l', 'l','r','r','r','r','r', 'r', 'r'))
 print(x.rescale, scalebox=.8, include.rownames=FALSE)
 @
 \FloatBarrier
@@ -228,6 +271,23 @@ ni.main <- within(ni.main, {
           & visatype!="WT" & visatype!="K3" & visatype!="B1" & visatype!="CP" & visatype!="J1"] <- NA
 })
 ni.main$visacat <- as.factor(ni.main$visacat)
+#value labels
+ni.main <- ni.main
+levels(ni.main$visacat)[levels(ni.main$visacat)=="B2"] <- "Tourists (B2)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="AS"] <- "Asylees (AS)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="H1B"] <- "Speciality occupations (H1B)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="EWI"] <- "Entry without Inspection (EWI)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="H4"] <- "Dependents of H1B (H4)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="PR"] <- "Parolees (PR)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="K1"] <- "Foreign citizen fiance of US citizen (K1)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="F1"] <- "Students (F1)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="L2"] <- "Dependents of L1 (L2)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="L1"] <- "Intra-company transferees (L1)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="WT"] <- "Visa waiver program - Temporary visitors (WT)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="K3"] <- "Spouse of US citizen (K3)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="B1"] <- "Temporary visitors for business (B1)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="CP"] <- "Family-based parole (CP)"
+levels(ni.main$visacat)[levels(ni.main$visacat)=="J1"] <- "Exchange visitors (J1)"
 
 visacat <- as.data.frame(table(droplevels(ni.main$visacat)))
 visacat <- visacat[order(-visacat$Freq),]
@@ -236,7 +296,9 @@ visacat$Percent <- 100* visacat$Number/sum(visacat$Number)
 @
 
 <<'Visa type table'>>=
-print(xtable(visacat, caption="Visa types with >=26,500 status adjusters between 1999-2011", digits=c(0,0,0,2)), include.rownames=FALSE)
+cols.comma = c(2)  # identify columns that need commas for thousands
+visacat[, cols.comma] = prettyNum( visacat[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(visacat, caption="Visa types with >=26,500 status adjusters between 1999-2011", digits=c(0,0,0,2), align=c('l', 'l', 'r','r')), include.rownames=FALSE)
 @
 
 And the same is represented graphically in Figure 2...
@@ -295,13 +357,18 @@ levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="4"] <- "Asylees an
 levels(ni.main$visacat.yecai)[levels(ni.main$visacat.yecai)=="5"] <- "Entry without inspection"
 
 visacat.yecai <- as.data.frame(table(droplevels(ni.main$visacat.yecai)))
-visacat.yecai <- visacat.yecai[order(-visacat.yecai$Freq),]
 visacat.yecai <- rename(visacat.yecai, c(Var1="Visa type", Freq="Number"))
-visacat.yecai$Percent <- 100* visacat.yecai$Number/sum(visacat$Number)
+visacat.yecai$Percent <- 100* visacat.yecai$Number/sum(visacat.yecai$Number)
+visacat.yecai <- visacat.yecai[order(-visacat.yecai$Number),]
+visacat.yecai$cumsum <- cumsum(visacat.yecai$Number)
+visacat.yecai$cumPercent <- 100* visacat.yecai$cumsum/sum(visacat.yecai$Number)
+visacat.yecai <- rename(visacat.yecai, c(cumsum="Cumulative total", cumPercent="Cumulative percent"))
 @
 
 <<'Yecai visa table'>>=
-print(xtable(visacat.yecai, caption="Status adjustment applicants based on Yecai's visa classification", digits=c(0,0,0,2)), include.rownames=FALSE)
+cols.comma = c(2,4)  # identify columns that need commas for thousands
+visacat.yecai[, cols.comma] = prettyNum( visacat.yecai[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(visacat.yecai, caption="Status adjustment applicants based on Yecai's visa classification", digits=c(0,0,0,2,0,2), align=c('l', 'l', 'r','r','r','r')), include.rownames=FALSE)
 @
 
 And graphically...
@@ -371,6 +438,13 @@ collapse2$Percent <- 100* collapse2$Number/sum(collapse2$Number)
 collapse2 <- collapse2[order(-collapse2$Number),]
 collapse2$cumsum <- cumsum(collapse2$Number)
 collapse2$cumPercent <- 100* collapse2$cumsum/sum(collapse2$Number)
+collapse2 <- rename(collapse2, c(cumsum="Cumulative total", cumPercent="Cumulative percent"))
+@
+
+<<'TB burden table'>>=
+cols.comma = c(2,4)  # identify columns that need commas for thousands
+collapse2[, cols.comma] = prettyNum( collapse2[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(collapse2, caption="Status adjustment applicants by TB burden", digits=c(0,0,0,2,0,2), align=c('l', 'l', 'r','r','r','r')), include.rownames=FALSE)
 @
 
 <<'TB burden details collapse'>>=
@@ -379,12 +453,14 @@ collapse2 <- rename(collapse2, c(tbburden="TB burden", region="Region", COB="Cou
 @
 
 <<'TB burden details table'>>=
+cols.comma = c(4)  # identify columns that need commas for thousands
+collapse2[, cols.comma] = prettyNum( collapse2[, cols.comma], big.mark=",", drop0trailing = TRUE)
 print(xtable(collapse2, caption="Number of status adjustment applicants by TB burden, region and country of birth"), include.rownames=FALSE)
 @
 
 \newpage
 Figure 4 shows the number of status adjustment applicants by their country of birth, stratified by TB burden.
-<<'COB and TB burden',fig.height=6,fig.width=15,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden">>=
+<<'COB and TB burden',fig.height=6,fig.width=15,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden",eval=FALSE>>=
 require(ggplot2)
 library(scales)
 #Aggregate over COB and tbburden
@@ -407,6 +483,74 @@ p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=
 p + geom_bar() + theme_bw() + coord_flip() +
   scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
   facet_wrap(~ tbburden, ncol=3, scales="free") 
+@
+\FloatBarrier
+
+<<'subsets by TB burden'>>=
+hightb <- subset(ni.main, tbburden=="high (TB incidence>100/100,000)", drop=TRUE) 
+hightb$tbburden <- factor(hightb$tbburden)
+hightb$COB <- factor(hightb$COB)
+
+mediumtb <- subset(ni.main, tbburden=="medium (TB incidence 20-100/100,000)", drop=TRUE) 
+mediumtb$tbburden <- factor(mediumtb$tbburden)
+mediumtb$COB <- factor(mediumtb$COB)
+
+lowtb <- subset(ni.main, tbburden=="low (TB incidence<20/100,000)", drop=TRUE) 
+lowtb$tbburden <- factor(lowtb$tbburden)
+lowtb$COB <- factor(lowtb$COB)
+@
+
+<<'Generating individual plots-by TB'>>=
+#high tb
+aggdata.hightb <- aggregate(hightb, by=list(hightb$COB), FUN=length)
+keepvars <- names(aggdata.hightb) %in% c("Group.1", "COB")
+aggdata.hightb <- aggdata.hightb[keepvars]
+aggdata.hightb <- rename(aggdata.hightb, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.hightb, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="High TB incidence")
+p.hightb <- p + coord_flip()  
+
+#medium tb
+aggdata.medtb <- aggregate(mediumtb, by=list(mediumtb$COB), FUN=length)
+keepvars <- names(aggdata.medtb) %in% c("Group.1", "COB")
+aggdata.medtb <- aggdata.medtb[keepvars]
+aggdata.medtb <- rename(aggdata.medtb, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.medtb, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="Medium TB incidence")
+p.medtb <- p + coord_flip()
+
+#low tb
+aggdata.lowtb <- aggregate(lowtb, by=list(lowtb$COB), FUN=length)
+keepvars <- names(aggdata.lowtb) %in% c("Group.1", "COB")
+aggdata.lowtb <- aggdata.lowtb[keepvars]
+aggdata.lowtb <- rename(aggdata.lowtb, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.lowtb, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="Low TB incidence")
+p.lowtb <- p + coord_flip()
+@
+
+<<'Generating combined plot-by TB',fig.height=6,fig.width=20,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden">>=
+require(gridExtra)
+grid.arrange(p.hightb, p.medtb, p.lowtb, nrow=1, ncol=3, main=textGrob("Status adjustment applicants, by TB burden of their country of birth"), left=textGrob("Country of birth", rot=90))
 @
 \FloatBarrier
 

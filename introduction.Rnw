@@ -7,6 +7,7 @@
 \usepackage{fixltx2e}
 \usepackage{booktabs} % for table formatting
 \usepackage{longtable}
+\usepackage{url}
 
 \begin{document}
 
@@ -151,6 +152,8 @@ uscis <- rename(uscis, c(INSCurrentStatus="visatype"))
 @
 
 <<'INS status table'>>=
+cols.comma = c(2)  # identify columns that need commas for thousands
+df[, cols.comma] = prettyNum( df[, cols.comma], big.mark=",", drop0trailing = TRUE)
 print(xtable(df, caption="Immigration statuses in the USCIS dataset"), include.rownames=FALSE)
 @
 
@@ -240,5 +243,8 @@ Limitations of this data include:
 \item The data provided by USCIS contains only approved applicants.  Actual number of applicants who undergo medical examination is greater.
 \item Using the date of last entry into the US may under-estimate the time to status adjustment.  However, in the absence of the date of first arrival into the US, the best estimate of the time to status adjustment is provided by the date of last entry into the US.
 \item Mexico border crossing - compare with Canada.
+
+\section{Data location}
+The raw data used for this analysis is located at \url{Z:\_Epi Team\USCIS} and it is a csv file called USCIS2.csv.  The cleaned dataset is ni.main.RDA which is a R file.  
 
 \end{document}
