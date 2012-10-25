@@ -14,7 +14,7 @@
 <<setup, echo=FALSE , message=FALSE>>=
 opts_chunk$set( echo=FALSE, 
                fig.align='center',
-               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE)
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE,cache=TRUE)
 library(xtable)
 library(plyr)
 library(reshape)
@@ -47,9 +47,9 @@ Individuals seeking status adjustment fall into two major categories: refugees a
 
 LPR applicants who entered the United States as refugees are not required to repeat the entire medical examination unless a Class A medical condition was found at the overseas examination; the primary purpose is to confirm compliance with the vaccination requirements. 
 
-LPR applicants who entered the US as nonimmigrants (for example, students or workers and their families) are required to undergo a complete medical examination.  For most, no medical examination would have been required prior to their arrival in the US.  Students may undergo some form of medical screening at their respective educational institutions, but this process is not regulated by the CDC.  Recent analyses by investigators at the Immigrant, Refugee, and Migrant Health (IRHM) Branch in CDC’s Division of Global Migration and Quarantine estimated that international students and exchange visitors contribute significantly to the tuberculosis burden in the US: they show a rate of 60.9 cases/100,000 admissions within the first year of their arrival (Liu, PLoSone 2012).  
+LPR applicants who entered the US as nonimmigrants (for example, students or workers and their families) are required to undergo a complete medical examination.  For most, no medical examination would have been required prior to their arrival in the US.  Students may undergo some form of medical screening at their respective educational institutions, but this process is not regulated by the CDC.  Recent analyses by investigators at the Immigrant, Refugee, and Migrant Health (IRHM) Branch in CDC’s Division of Global Migration and Quarantine estimated that international students and exchange visitors contribute significantly to the tuberculosis burden in the US: they show a rate of 60.9 cases/100,000 admissions within the first year of their arrival.\footnote{Liu Y, Painter J, Posey D, et.al. Estimating the impact of newly arrived foreign-born persons on tuberculosis in the United States. PLoS One 2012;7(2)}  
 
-Therefore, the civil surgeons exam on these individuals is potentially the only systematic information on the conditions of public health importance in this population, particularly TB.  Since the risk of TB among foreign-born individuals in the US is significantly associated with the duration of stay in the US, the timing of the Civil Surgeon exam is of importance.      
+Therefore, the civil surgeons exam on these individuals is potentially the only systematic information on the conditions of public health importance in this population, particularly TB.  Since the risk of TB among foreign-born individuals in the US is significantly associated with the duration of stay in the US, the timing of the civil surgeon exam is of importance.      
 
 {\bf Therefore, two key questions that would be important to address are:}
 \begin{enumerate}
@@ -60,7 +60,7 @@ Therefore, the civil surgeons exam on these individuals is potentially the only 
 The medical forms from the Civil Surgeon exams are sent to USCIS by the applicant for status adjustment and are maintained in a paper form by the USCIS and not entered into a database.  Therefore, the civil surgeon exam data is not readily accessible for an analytic purpose.  However, a basic demographic form (I-485) that accompanies the application for status adjustment is entered into a database by USCIS but the date of the Civil Surgeon exam is not recorded in this form.  
 
 {\bf Data request to USCIS:}
-In March 2012, the Epidemiology team at IRHM initiated a request to obtain data from USCIS to explore how closely we could approximate the civil surgeon exam date with other dates that are associated with an individual applicant.  In response to this request, USCIS provided us with data from 1991-2011 on approved status adjustment applications that contained the following variables: 
+In March 2012, the Epidemiology team at IRHM initiated a request to obtain data from USCIS to explore how closely we could approximate the civil surgeon exam date with other dates that are associated with an individual applicant.  In response to this request, USCIS provided us with data from 1999-2011 on approved status adjustment applications that contained the following variables: 
 \begin{itemize}
 \item Most recent US entry date
 \item Application receipt date
@@ -87,7 +87,7 @@ uscis <- read.csv("C:/Users/wau4/Desktop/uscis/uscis2.csv", sep=",", header=T)
 @
 
 The dataset contains the following variables.  Note: This is the raw dataset plus date variables and a time difference variable created in SAS.
-<<'uscis variable names',results='markup'>>=
+<<'uscis variable names',results='markup',eval=FALSE>>=
 names(uscis)
 @
 
@@ -105,12 +105,10 @@ Description of variables:
 \item CodeStat: No longer used; it should be blank.
 \item LastArrivalDate:  Date of last entry into the US
 \item ApprovedDate: Application approval date 
-\item *LastArrivalDate1, ApprovedDate1, ReceiptDate1, ReceivedDate1: Variables in date format
-\item *durationmo and durationyr: time (in months and years) between last arrival in US and application approval date
-\item timetoexammo and timetoexamyr: time (in months and years) between last arrival in the US and application receipt date
+\item LastArrivalDate1, ApprovedDate1, ReceiptDate1, ReceivedDate1: Variables in date format
+\item durationmo and durationyr: time (in months and years) between last arrival in US and application approval date
+\item timetoexammo and timetoexamyr: time (in months and years) between last arrival in the US and application receipt date \footnote{Variables listed in the last three bullets were created in SAS}
 \end{itemize}
-*Variables created in SAS
-
 
 <<'Drop variables'>>=
 #List the names of variables to be dropped 
@@ -166,7 +164,9 @@ visacount$Var1 <- as.factor(visacount$Var1)
 The total number of non-immigrant visa types represented in this dataset is \Sexpr{nlevels(visacount$Var1)}.  This excludes refugees, asylees and parolees.
 
 \newpage
-The annual number of applicants for status adjustment are shown in Figure 1, by their immigration status.
+The annual number of applicants for status adjustment are shown in Figure 1, by their immigration status.  Note: Data provided by USCIS between 1999-2005 seems to be incomplete as it does not match the number of refugees and non-immigrants entering the US annually, as reported by the Department of Homeland Security, Immigration Statistics 
+(\url{http://www.dhs.gov/yearbook-immigration-statistics}).
+
 <<'Extract year for plotting'>>=
 require(lubridate)
 uscis$ApprovedDate1 <- ymd(uscis$ApprovedDate1)
@@ -220,7 +220,7 @@ require(Hmisc)
 describe(uscis$texamyr)
 @
 
-The negative values are due to scenarios where individuals can leave the country and re-enter after filing their application for status adjustment.  The missing values are due to a missing date of last entry into the US or date of application for status adjustment.  If either are missing the texamyr variable cannot be calculated.  
+The negative values could be due to scenarios where individuals can leave the country and re-enter after filing their application for status adjustment or data entry errors.  The missing values are due to a missing date of last entry into the US or date of application for status adjustment due to which the variable 'texamyr' variable cannot be calculated.  
 
 <<'Handling negative and missing values (NAs) in texamyr'>>= 
 #Drop -ve and NAs in texamyr
@@ -229,7 +229,7 @@ uscis <- uscis[which(uscis$texamyr>=0),]
 
 Therefore, after dropping negative and missing values of this variable, there are \Sexpr{nrow(uscis)} records.
 
-Although ths data contains refugees, we will drop them from further analysis and focus on non-immigrants.  Asylees and parolees are being kept in this analysis.  This dataset will be referred to as the non-immigrant(ni) dataset.
+Although this data contains refugees, we will drop them from further analysis and focus on non-immigrants.  Asylees and parolees are included in this analysis.  This dataset will be referred to as the non-immigrant(ni) dataset.
 
 <<'save ni'>>=
 ni <- subset(uscis, visatype!="RE", drop=TRUE) 
@@ -242,9 +242,9 @@ Limitations of this data include:
 \begin{enumerate}
 \item The data provided by USCIS contains only approved applicants.  Actual number of applicants who undergo medical examination is greater.
 \item Using the date of last entry into the US may under-estimate the time to status adjustment.  However, in the absence of the date of first arrival into the US, the best estimate of the time to status adjustment is provided by the date of last entry into the US.
-\item Mexico border crossing - compare with Canada.
+\end{enumerate}
 
 \section{Data location}
-The raw data used for this analysis is located at \url{Z:\_Epi Team\USCIS} and it is a csv file called USCIS2.csv.  The cleaned dataset is ni.main.RDA which is a R file.  
+The raw data used for this analysis is located at \url{Z:\_Epi Team\USCIS} and it is a csv file called USCIS2.csv.    
 
 \end{document}

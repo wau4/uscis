@@ -1,0 +1,352 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+\usepackage{rotating}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE)
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+require(doBy)
+@
+
+\title{{\bf Chapter 3 - Overlaying tuberculosis burden}\\
+Applicants for Status Adjustment in the US\\
+USCIS Data}
+\date{\today}
+\maketitle
+
+\newpage
+\tableofcontents           
+\listoftables
+\listoffigures
+
+\newpage
+<<'load data'>>=
+load("C:/Users/wau4/Desktop/uscis/uscis/ni.main1.Rda")
+@
+
+\section{TB classification}
+Using WHO's TB incidence data for 2010, we classified countries into high ($\geq$100/100,000), medium ($\geq$20 to $<$100/100,000) and low TB incidence ($<$20/100,000).  Table 1 provides a summary of status adjustment applicants by the TB burden of their country of birth.  Table 2 is a detailed table presenting the number of status adjustment applicants by their country of birth, geographical region and WHO TB burden of their birth country.
+
+In addition to the WHO TB classification, we used the classification developed by Yecai for his PLoS One paper, as follows: high TB incidence ($\geq$100/100,000), medium TB incidence ($\geq$15 to $<$100/100,000) and low TB incidence ($<$15/100,000).  Figure 1 and 2 show the countries of birth of status adjusters according to WHO and Yecai's TB classifications, respectively.
+
+<<'merge with tbwho.merge'>>=
+#tbwho.merge has been created in the tbwho.Rmd file using WHO's TB incidence data.  Two variables: tbburden and tbburden.yecai have been created to classify countries into high, medium and low tb burden.
+load("C:/Users/wau4/Desktop/uscis/uscis/tbwho.merge.Rda")
+
+ni.main <- merge(ni.main1, tbwho.merge, by="COB")
+
+
+keepvars <- names(ni.main) %in% c("COB",  "ReceiptNumber",  "visatype", "LastArrivalDate1", "ReceiptDate1", "texamyr",  "insstatus", "year", "region", "visacat", "visacat.yecai", "e_inc_100k_2010", "tbburden", "tbburden.yecai", "mean", "quantile.50%")
+ni.main <- ni.main[keepvars]
+ni.main <- rename(ni.main, c(e_inc_100k_2010="TBInc2010", mean="meanTBInc"))
+ni.main <- rename(ni.main, c('quantile.50%'="medianTBInc"))
+
+ni.main$tbburden <- as.factor(ni.main$tbburden)
+ni.main$tbburden.yecai <- as.factor(ni.main$tbburden.yecai)
+#value labels
+ni.main <- ni.main
+levels(ni.main$tbburden)[levels(ni.main$tbburden)=="high"] <- "high (TB incidence>=100/100,000)"
+levels(ni.main$tbburden)[levels(ni.main$tbburden)=="medium"] <- "medium (TB incidence >=20 to <100/100,000)"
+levels(ni.main$tbburden)[levels(ni.main$tbburden)=="low"] <- "low (TB incidence<20/100,000)"
+
+ni.main$tbburden <- factor(ni.main$tbburden, c("high (TB incidence>=100/100,000)", "medium (TB incidence >=20 to <100/100,000)", "low (TB incidence<20/100,000)"), levels=c("high (TB incidence>=100/100,000)", "medium (TB incidence >=20 to <100/100,000)", "low (TB incidence<20/100,000)"))
+
+levels(ni.main$tbburden.yecai)[levels(ni.main$tbburden.yecai)=="high"] <- "high (TB incidence>=100/100,000)"
+levels(ni.main$tbburden.yecai)[levels(ni.main$tbburden.yecai)=="medium"] <- "medium (TB incidence >=15 to <100/100,000)"
+levels(ni.main$tbburden.yecai)[levels(ni.main$tbburden.yecai)=="low"] <- "low (TB incidence<15/100,000)"
+
+ni.main$tbburden.yecai <- factor(ni.main$tbburden.yecai, c("high (TB incidence>=100/100,000)", "medium (TB incidence >=15 to <100/100,000)", "low (TB incidence<15/100,000)"), levels=c("high (TB incidence>=100/100,000)", "medium (TB incidence >=15 to <100/100,000)", "low (TB incidence<15/100,000)"))
+@
+
+<<'TB classification',eval=FALSE>>=
+#create a variable for TB burden using WHO classification and Yecai's classification
+#WHO classification
+#This classification was derived from WHO data in TB incidence rate/100,000 (see the tbwho.Rmd document)
+ni.main <- within(ni.main, {
+  tbburden <- NA
+  tbburden[COB=="Canada" | COB=="Cuba" | COB=="France" | COB=="Germany" | COB=="Israel" | COB=="Jamaica" | COB=="UK" | COB=="Trinidad"] <- "low (TB incidence<20/100,000)"
+  tbburden[COB=="Argentina" | COB=="Brazil" | COB=="Colombia" | COB=="El Salvador" | COB=="Guatemala" | COB=="Japan" | COB=="Mexico" | COB=="Poland"
+           | COB=="S Korea" | COB=="Ukraine" | COB=="Venezuela" | COB=="Iran"] <- "medium (TB incidence 20-100/100,000)"
+  tbburden[COB=="China" | COB=="India" | COB=="Philippines" 
+           | COB=="Haiti" | COB=="Peru" | COB=="Dom Republic"
+           | COB=="Pakistan" | COB=="Viet Nam" | COB=="Ecuador"
+           | COB=="Nigeria" | COB=="Ethiopia" | COB=="Russia" | COB=="Ghana" | COB=="Thailand"
+           | COB=="Romania" | COB=="Honduras" | COB=="Kenya"] <- "high (TB incidence>100/100,000)"
+})
+ni.main$tbburden <- factor(ni.main$tbburden, c("high (TB incidence>100/100,000)", "medium (TB incidence 20-100/100,000)", "low (TB incidence<20/100,000)"), levels=c("high (TB incidence>100/100,000)", "medium (TB incidence 20-100/100,000)", "low (TB incidence<20/100,000)"))
+@
+
+<<'Yecai TB classification',eval=FALSE>>=
+#this was taken from Liu, Y. PLoS One 2012
+ni.main <- within(ni.main, {
+  tbburden.yecai <- NA
+  tbburden.yecai[COB=="Canada" | COB=="Cuba" | COB=="France" | COB=="Germany" | COB=="Israel" | COB=="Jamaica" | COB=="UK"] <- "low (TB incidence<14/100,000)"
+  tbburden.yecai[COB=="Argentina" | COB=="Brazil" | COB=="Colombia" | COB=="El Salvador" | COB=="Guatemala" | COB=="Japan" | COB=="Mexico" | COB=="Poland"
+                 | COB=="S Korea" | COB=="Ukraine" | COB=="Venezuela" | COB=="Iran" | COB=="Trinidad"] <- "medium (TB incidence 15-99/100,000)"
+  tbburden.yecai[COB=="China" | COB=="India" | COB=="Philippines" 
+                 | COB=="Haiti" | COB=="Peru" | COB=="Dom Republic"
+                 | COB=="Pakistan" | COB=="Viet Nam" | COB=="Ecuador"
+                 | COB=="Nigeria" | COB=="Ethiopia" | COB=="Russia" | COB=="Ghana" | COB=="Thailand"
+                 | COB=="Romania" | COB=="Honduras" | COB=="Kenya"] <- "high (TB incidence>100/100,000)"
+})
+
+ni.main$tbburden.yecai <- factor(ni.main$tbburden.yecai, c("high (TB incidence>100/100,000)", "medium (TB incidence 15-99/100,000)", "low (TB incidence<14/100,000)"), levels=c("high (TB incidence>100/100,000)", "medium (TB incidence 15-99/100,000)", "low (TB incidence<14/100,000)"))
+@
+
+<<'TB burden collapse'>>=
+collapse2 <- summaryBy(COB ~ tbburden, FUN=length, data=ni.main)
+require(reshape)
+collapse2 <- rename(collapse2, c(tbburden="TB burden", COB.length="Number"))
+collapse2$Percent <- 100* collapse2$Number/sum(collapse2$Number)
+collapse2 <- collapse2[order(-collapse2$Number),]
+collapse2$cumsum <- cumsum(collapse2$Number)
+collapse2$cumPercent <- 100* collapse2$cumsum/sum(collapse2$Number)
+collapse2 <- rename(collapse2, c(cumsum="Cumulative total", cumPercent="Cumulative percent"))
+@
+
+<<'TB burden table'>>=
+cols.comma = c(2,4)  # identify columns that need commas for thousands
+collapse2[, cols.comma] = prettyNum( collapse2[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(collapse2, caption="Status adjustment applicants by TB burden of their countries of birth", digits=c(0,0,0,2,0,2), align=c('l', 'l', 'r','r','r','r')), include.rownames=FALSE)
+@
+
+<<'TB burden details collapse'>>=
+collapse2 <- summaryBy(COB ~ tbburden + region + COB + meanTBInc + medianTBInc, FUN=length, data=ni.main)
+collapse2 <- rename(collapse2, c(tbburden="TB burden", region="Region", COB="Country of birth", meanTBInc="Mean TB incidence 2010", medianTBInc="Median TB Incidence 2010", COB.length="Number"))
+@
+
+<<'TB burden details table'>>=
+cols.comma = c(6)  # identify columns that need commas for thousands
+collapse2[, cols.comma] = prettyNum( collapse2[, cols.comma], big.mark=",", drop0trailing = TRUE)
+
+x.rescale <- xtable(collapse2, caption="Number of status adjustment applicants by TB burden, region and country of birth", digits=c(0,0,0,0,1,1,0), align=c('l', 'l', 'l', 'l', 'c','c','r'), label='tabrescaled')
+
+print(x.rescale, scalebox=.9, include.rownames=FALSE, floating.environment='sidewaystable')
+@
+\FloatBarrier
+
+\newpage
+<<'COB and TB burden',fig.height=6,fig.width=15,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden",eval=FALSE>>=
+require(ggplot2)
+library(scales)
+#Aggregate over COB and tbburden
+aggdata <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden), FUN=length)
+keepvars <- names(aggdata) %in% c("Group.1", "Group.2", "COB")
+aggdata <- aggdata[keepvars]
+###Rename variables
+require(reshape)
+aggdata <- rename(aggdata, c(Group.1="cob", Group.2="tbburden", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") 
+
+#this plot will flip the axes and show cob on y-axis (easier to read)
+#p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, limits=c(0,600000)) #this gives range of y axis (0 - 600000)
+#p + geom_bar() + coord_flip() + scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000))
+
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden, ncol=3, scales="free") 
+@
+
+
+<<'subsets by TB burden'>>=
+hightb <- subset(ni.main, tbburden=="high (TB incidence>=100/100,000)", drop=TRUE) 
+hightb$tbburden <- factor(hightb$tbburden)
+hightb$COB <- factor(hightb$COB)
+
+mediumtb <- subset(ni.main, tbburden=="medium (TB incidence >=20 to <100/100,000)", drop=TRUE) 
+mediumtb$tbburden <- factor(mediumtb$tbburden)
+mediumtb$COB <- factor(mediumtb$COB)
+
+lowtb <- subset(ni.main, tbburden=="low (TB incidence<20/100,000)", drop=TRUE) 
+lowtb$tbburden <- factor(lowtb$tbburden)
+lowtb$COB <- factor(lowtb$COB)
+@
+
+<<'Generating individual plots-by TB'>>=
+#high tb
+aggdata.hightb <- aggregate(hightb, by=list(hightb$COB), FUN=length)
+keepvars <- names(aggdata.hightb) %in% c("Group.1", "COB")
+aggdata.hightb <- aggdata.hightb[keepvars]
+aggdata.hightb <- rename(aggdata.hightb, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.hightb, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="High TB incidence")
+p.hightb <- p + coord_flip()  
+
+#medium tb
+aggdata.medtb <- aggregate(mediumtb, by=list(mediumtb$COB), FUN=length)
+keepvars <- names(aggdata.medtb) %in% c("Group.1", "COB")
+aggdata.medtb <- aggdata.medtb[keepvars]
+aggdata.medtb <- rename(aggdata.medtb, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.medtb, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="Medium TB incidence")
+p.medtb <- p + coord_flip()
+
+#low tb
+aggdata.lowtb <- aggregate(lowtb, by=list(lowtb$COB), FUN=length)
+keepvars <- names(aggdata.lowtb) %in% c("Group.1", "COB")
+aggdata.lowtb <- aggdata.lowtb[keepvars]
+aggdata.lowtb <- rename(aggdata.lowtb, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.lowtb, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="Low TB incidence")
+p.lowtb <- p + coord_flip()
+@
+
+<<'Generating combined plot-by TB',fig.height=6,fig.width=20,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden",warning=FALSE>>=
+require(gridExtra)
+pdf("grid.pdf", width=17, height=5)
+grid <- grid.arrange(p.hightb, p.medtb, p.lowtb, nrow=1, ncol=3, left=textGrob("Country of birth", rot=90))
+@
+
+\begin{sidewaysfigure}
+\centering
+\scalebox{0.6}
+{\includegraphics{grid.pdf}}
+\caption{Status adjustment applicants, by TB burden of their country of birth}
+\end{sidewaysfigure}
+\FloatBarrier
+
+\newpage 
+<<'COB and Yecai TB burden',fig.height=6,fig.width=15,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden (Yecai classification)",eval=FALSE>>=
+library(ggplot2)
+library(scales)
+#Aggregate over COB and tbburden.yecai
+aggdata.yecai <- aggregate(ni.main, by=list(ni.main$COB, ni.main$tbburden.yecai), FUN=length)
+keepvars <- names(aggdata.yecai) %in% c("Group.1", "Group.2", "COB")
+aggdata.yecai <- aggdata.yecai[keepvars]
+###Rename variables
+require(reshape)
+aggdata.yecai <- rename(aggdata.yecai, c(Group.1="cob", Group.2="tbburden.yecai", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order <- transform(aggdata.yecai, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+p <- ggplot(data=cob_order, aes(x=cob, y=Freq)) + geom_bar(colour="grey", width=.8) + 
+  xlab("Country of birth") + ylab("Frequency") 
+
+p + geom_bar() + theme_bw() + coord_flip() +
+  scale_y_continuous(labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  facet_wrap(~ tbburden.yecai, ncol=3, scales="free") 
+@
+
+<<'subsets by Yecai TB burden'>>=
+hightb.y <- subset(ni.main, tbburden.yecai=="high (TB incidence>=100/100,000)", drop=TRUE) 
+hightb.y$tbburden.yecai <- factor(hightb.y$tbburden.yecai)
+hightb.y$COB <- factor(hightb.y$COB)
+
+mediumtb.y <- subset(ni.main, tbburden.yecai=="medium (TB incidence >=15 to <100/100,000)", drop=TRUE) 
+mediumtb.y$tbburden.yecai <- factor(mediumtb.y$tbburden.yecai)
+mediumtb.y$COB <- factor(mediumtb.y$COB)
+
+lowtb.y <- subset(ni.main, tbburden.yecai=="low (TB incidence<15/100,000)", drop=TRUE) 
+lowtb.y$tbburden.yecai <- factor(lowtb.y$tbburden.yecai)
+lowtb.y$COB <- factor(lowtb.y$COB)
+@
+
+<<'Generating individual plots-by Yecai TB'>>=
+#high tb
+aggdata.hightb.y <- aggregate(hightb.y, by=list(hightb.y$COB), FUN=length)
+keepvars <- names(aggdata.hightb.y) %in% c("Group.1", "COB")
+aggdata.hightb.y <- aggdata.hightb.y[keepvars]
+aggdata.hightb.y <- rename(aggdata.hightb.y, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order.hy <- transform(aggdata.hightb.y, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+
+p <- ggplot(data=cob_order.hy, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="High TB incidence")
+p.hightb.y <- p + coord_flip()  
+
+#medium tb
+aggdata.medtb.y <- aggregate(mediumtb.y, by=list(mediumtb.y$COB), FUN=length)
+keepvars <- names(aggdata.medtb.y) %in% c("Group.1", "COB")
+aggdata.medtb.y <- aggdata.medtb.y[keepvars]
+aggdata.medtb.y <- rename(aggdata.medtb.y, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order.my <- transform(aggdata.medtb.y, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order.my, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="Medium TB incidence")
+p.medtb.y <- p + coord_flip()
+
+#low tb
+aggdata.lowtb.y <- aggregate(lowtb.y, by=list(lowtb.y$COB), FUN=length)
+keepvars <- names(aggdata.lowtb.y) %in% c("Group.1", "COB")
+aggdata.lowtb.y <- aggdata.lowtb.y[keepvars]
+aggdata.lowtb.y <- rename(aggdata.lowtb.y, c(Group.1="cob", COB="Freq"))
+###Code to make the graph look ordered by frequency and not alphabetical order of country of birth (cob)
+cob_order.ly <- transform(aggdata.lowtb.y, cob=reorder(cob, Freq)) #Countries appreas from low to high frequency
+#this plot will contain cob on x-axis
+
+p <- ggplot(data=cob_order.ly, aes(x=cob, y=Freq)) + geom_bar(colour="light grey", width=.8) + 
+  ylab("Frequency") + opts(axis.title.y = theme_blank()) +
+  scale_y_continuous(limits=c(0,600000), labels=comma, breaks=c(20000, 100000, 200000, 300000, 400000, 500000, 600000)) +
+  opts(title="Low TB incidence")
+p.lowtb.y <- p + coord_flip()
+@
+
+<<'Generating combined plot-by Yecai TB',fig.height=6,fig.width=20,fig.align='center',fig.cap="Country of birth of non-immigrant applicants for status adjustment, by TB burden",warning=FALSE>>=
+require(gridExtra)
+pdf("gridy.pdf", width=17, height=5)
+gridy <- grid.arrange(p.hightb.y, p.medtb.y, p.lowtb.y, nrow=1, ncol=3, left=textGrob("Country of birth", rot=90))
+@
+
+\begin{sidewaysfigure}
+\centering
+\scalebox{0.6}
+{\includegraphics{gridy.pdf}}
+\caption{Status adjustment applicants, by TB burden (Yecai's classification) of their country of birth.}
+\end{sidewaysfigure}
+\FloatBarrier
+
+<<'save data'>>=
+ni.main$status <- 1
+save(ni.main, file="ni.main.Rda")
+@
+
+
+
+\end{document}

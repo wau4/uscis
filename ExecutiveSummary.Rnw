@@ -1,0 +1,234 @@
+\documentclass{article}
+
+\usepackage[margin=.5in]{geometry}
+\usepackage[section]{placeins}  %% keeps output from floating into adjoining sections
+\usepackage{setspace} %for Hmisc::describe
+\usepackage{relsize}  %for Hmisc::describe
+\usepackage{fixltx2e}
+\usepackage{booktabs} % for table formatting
+\usepackage{longtable}
+\usepackage{url}
+
+\begin{document}
+
+<<setup, echo=FALSE , message=FALSE>>=
+opts_chunk$set( echo=FALSE, 
+               fig.align='center',
+               message=FALSE, comment="", tidy=TRUE, results='asis',warnings=FALSE,cache=TRUE)
+library(xtable)
+library(plyr)
+library(reshape)
+require(survival)
+require(ggplot2)
+require(scales)
+@
+
+\title{{\bf Executive Summary\\
+Applicants for Status Adjustment in the US}}
+\author{Sasi Jonnalagadda, John Painter\\
+Epidemiology Team\\
+Immigrant, Refugee and Migrant Health Branch}
+\date{\today}
+\maketitle
+
+Individuals applying for adjustment of status to legal permanent residency (LPR) in the United States (US) undergo a mandatory medical examination, conducted by civil surgeons designated by the United States Citizenship and Immigration Services (USCIS) according to technical instructions provided by the Centers for Disease Control and Prevention. 
+
+The civil surgeon exam focuses on inadmissable conditions of public health importance, tuberculosis (TB) being the main focus of this exam. Recent analyses by investigators at the Immigrant, Refugee, and Migrant Health (IRHM) Branch in CDC’s Division of Global Migration and Quarantine estimated that international students and exchange visitors contribute significantly to the tuberculosis burden in the US: they estimated a rate of 60.9 cases/100,000 admissions within the first year of their arrival.\footnote{Liu Y, Painter J, Posey D, et.al. Estimating the impact of newly arrived foreign-born persons on tuberculosis in the United States. PLoS One 2012;7(2)}  
+
+The civil surgeons exam is therefore the only systematic information on this population, particularly with reference to TB.  Since the risk of TB among foreign-born individuals in the US is significantly associated with time since arrival in the US, the timing of the civil surgeon exam is of importance.      
+
+
+\paragraph{{\bf Therefore, two key questions that would be important to address are:}}
+\begin{enumerate}
+{\bf \item What is the timing of the civil surgeon examination, from the time of entry into the US as a non-immigrant?
+\item What is the impact of this exam and it's timing on prevention of TB cases among foreign born individuals in the US?}
+\end{enumerate}
+
+{\bf Data request to USCIS:}
+In March 2012, the Epidemiology team at IRHM initiated a request to obtain data from USCIS to explore how closely we could approximate the civil surgeon exam date with other dates that are associated with an individual applicant.  In response to this request, USCIS provided us with data from 1999-2011 on approved status adjustment applications (form I-485) that contained the following variables: 
+\begin{itemize}
+\item Most recent US entry date
+\item Application receipt date
+\item Application approval date
+\item Country of birth of the applicant
+\item Visa status at the time of applying for status adjustment
+\end{itemize}
+
+The civil surgeon exam forms are maintained in paper copy only and form I-485 does not capture the civil surgeon exam date.  Time between last arrival in the US and application receipt date (at USCIS) was used as a proxy for time to civil surgeon exam since last arrival in the US.
+
+\paragraph{{\bf Aims}}
+
+Key questions addressed in this analysis:
+\begin{enumerate}
+\item Which countries do applicants for status adjustment represent most frequently?
+\item What non-immigrant visa types do these applicants enter the US on?
+\item How long do non-immigrants stay in the US before adjusting their status?  
+\end{enumerate}
+
+\newpage
+\paragraph{{\bf Key findings}}
+<<'Load data'>>=
+load("C:/Users/wau4/Desktop/uscis/uscis/ni.main.Rda")
+@
+We analyzed data from \Sexpr{nrow(ni.main)} applicants for status adjustment who applied for LPR between 1999-2011.  The break-up of these individuals by their immigration status is shown in Table 1:
+<<'INS status'>>=
+df <- ddply(ni.main, .(insstatus), function(x) c(count=nrow(x)))
+df <- rename(df, c(insstatus="Immigration Status", count="Number"))
+df$percent <- 100* df$Number/sum(df$Number)
+df <- df[order(-df$Number),]
+@
+
+<<'INS status table'>>=
+cols.comma = c(2)  # identify columns that need commas for thousands
+df[, cols.comma] = prettyNum( df[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(df, caption="Immigration statuses in the USCIS dataset"), include.rownames=FALSE)
+@
+
+Annual number of status adjustment applicants and the cumulative number, by immigration status are shown in the two plots below.  Annually, as per Department of Homeland Security, approximately 500,000 individuals adjust status to LPR in the US.  The data from USCIS does not match this figure, possibly due to incomplete data provided by USCIS.
+<<'Annual number of applicants',fig.height=4,fig.width=6,fig.cap="Annual number of applicants for status adjustment">>=
+require(ggplot2)
+require(scales)
+ggplot(data=ni.main, aes(x=year)) + geom_bar(aes(fill=insstatus), position="dodge") +
+  xlab("Year of application for status adjustment") + scale_y_continuous(labels=comma,"Number") + 
+  opts(legend.justification=c(0,1), legend.position=c(0,1))
+@
+
+
+The analysis was limited to 37 countries with $\geq$20,000 status adjustment applicants between 1999-2011.  We classified countries of birth of the status adjustment applicants into high ($\geq$100/100,000), medium ($\geq$20 to $<$100/100,000) and low ($<$20/100,000) TB burden, according to the country-specific 2010 WHO TB incidence rates.  Of all applicants between 1999-2011, 28\%, 34\% and 38\% were from countries with high, medium and low TB burden.
+
+<<'TB burden details collapse'>>=
+collapse2 <- summaryBy(COB ~ tbburden + region + COB, FUN=length, data=ni.main)
+collapse2 <- rename(collapse2, c(tbburden="TB burden", region="Region", COB="Country of birth", COB.length="Number"))
+@
+
+<<'TB burden details table'>>=
+cols.comma = c(4)  # identify columns that need commas for thousands
+collapse2[, cols.comma] = prettyNum( collapse2[, cols.comma], big.mark=",", drop0trailing = TRUE)
+
+x.rescale <- xtable(collapse2, caption="Number of status adjustment applicants by TB burden, region and country of birth", digits=c(0,0,0,0,0), align=c('l', 'l', 'l', 'l', 'r'), label='tabrescaled')
+
+print(x.rescale, scalebox=.9, include.rownames=FALSE)
+@
+\FloatBarrier
+
+The visa statuses of the status adjustment applicants are shown below, along with the number and percent is each category.
+<<'visa types'>>=
+visacat.yecai <- as.data.frame(table(droplevels(ni.main$visacat.yecai)))
+visacat.yecai <- rename(visacat.yecai, c(Var1="Visa type", Freq="Number"))
+visacat.yecai$Percent <- 100* visacat.yecai$Number/sum(visacat.yecai$Number)
+visacat.yecai <- visacat.yecai[order(-visacat.yecai$Number),]
+@
+
+<<'Yecai visa table'>>=
+cols.comma = c(2)  # identify columns that need commas for thousands
+visacat.yecai[, cols.comma] = prettyNum( visacat.yecai[, cols.comma], big.mark=",", drop0trailing = TRUE)
+print(xtable(visacat.yecai, caption="Status adjustment applicants based on Yecai's visa classification", digits=c(0,0,0,2), align=c('l', 'l', 'r','r')), include.rownames=FALSE)
+@
+\FloatBarrier
+
+The median time to status adjustment since last arrival in the US is \Sexpr{median(ni.main$texamyr)} years.  The plot below shows the median time to status adjustment among applicants from high (1.5 years), medium (1.7 years) and low (2.5 years) TB incidence countries.
+
+<<'defining survival frame'>>=
+# define custom function to create a survival data.frame
+#This data.frame will allow use of ggplot to plot the survival function (rather than using plot)
+#The original code for creating this data.frame (provide url) was modified to plot the hazard function (cumevent) rather than the survival function
+createSurvivalFrame <- function(f.survfit){
+  # initialise frame variable
+  f.frame <- NULL
+  # check if more then one strata
+  if(length(names(f.survfit$strata)) == 0){
+    # create data.frame with data from survfit
+    f.frame <- data.frame(time=f.survfit$time, n.risk=f.survfit$n.risk, n.event=f.survfit$n.event, n.censor = f.survfit
+                          $n.censor, surv=f.survfit$surv, cumevent=f.survfit$cumevent, upper=f.survfit$upper, lower=f.survfit$lower)
+    # create first two rows (start at 1)
+    f.start <- data.frame(time=c(0, f.frame$time[1]), n.risk=c(f.survfit$n, f.survfit$n), n.event=c(0,0),
+                          n.censor=c(0,0), surv=c(1,1), cumevent=c(0,0), upper=c(1,1), lower=c(1,1))
+    # add first row to dataset
+    f.frame <- rbind(f.start, f.frame)
+    # remove temporary data
+    rm(f.start)
+  }
+  else {
+    
+    # create vector for strata identification
+    f.strata <- NULL
+    for(f.i in 1:length(f.survfit$strata)){
+      # add vector for one strata according to number of rows of strata
+      f.strata <- c(f.strata, rep(names(f.survfit$strata)[f.i], f.survfit$strata[f.i]))
+    }
+    # create data.frame with data from survfit (create column for strata)
+    f.frame <- data.frame(time=f.survfit$time, n.risk=f.survfit$n.risk, n.event=f.survfit$n.event, n.censor = f.survfit
+                          $n.censor, surv=f.survfit$surv, cumevent=f.survfit$cumevent, upper=f.survfit$upper, lower=f.survfit$lower, strata=factor(f.strata))
+    # remove temporary data
+    rm(f.strata)
+    # create first two rows (start at 1) for each strata
+    for(f.i in 1:length(f.survfit$strata)){
+      # take only subset for this strata from data
+      f.subset <- subset(f.frame, strata==names(f.survfit$strata)[f.i])
+      # create first two rows (time: 0, time of first event)
+      f.start <- data.frame(time=c(0, f.subset$time[1]), n.risk=rep(f.survfit[f.i]$n, 2), n.event=c(0,0),
+                            n.censor=c(0,0), surv=c(1,1), cumevent=c(0,0), upper=c(1,1), lower=c(1,1), strata=rep(names(f.survfit$strata)[f.i],
+                                                                                                                  2))
+      # add first two rows to dataset
+      f.frame <- rbind(f.start, f.frame)
+      # remove temporary data
+      rm(f.start, f.subset)
+    }
+    # reorder data
+    f.frame <- f.frame[order(f.frame$strata, f.frame$time), ]
+    # rename row.names
+    rownames(f.frame) <- NULL
+  }
+  # return frame
+  return(f.frame)
+}
+
+# define custom function to draw kaplan-meier curve with ggplot
+qplot_survival <- function(f.frame, f.CI="default", f.shape=3){
+  # use different plotting commands dependig whether or not strata's are given
+  if("strata" %in% names(f.frame) == FALSE){
+    # confidence intervals are drawn if not specified otherwise
+    if(f.CI=="default" | f.CI==TRUE ){
+      # create plot with 4 layers (first 3 layers only events, last layer only censored)
+      # hint: censoring data for multiple censoring events at timepoint are overplotted
+      # (unlike in plot.survfit in survival package)
+      ggplot(data=f.frame) + geom_step(aes(x=time, y=cumevent), direction="hv") + geom_step(aes(x=time,
+                                                                                                y=upper), directions="hv", linetype=2) + geom_step(aes(x=time,y=lower), direction="hv", linetype=2)
+    }
+    else {
+      # create plot without confidence intervalls
+      ggplot(data=f.frame) + geom_step(aes(x=time, y=cumevent), direction="hv")
+    }
+  }
+  else {
+    if(f.CI=="default" | f.CI==FALSE){
+      # without CI
+      ggplot(data=f.frame, aes(group=strata, colour=strata)) + geom_step(aes(x=time, y=cumevent),
+                                                                         direction="hv")
+    }
+    else {
+      # with CI (hint: use alpha for CI)
+      ggplot(data=f.frame, aes(colour=strata, group=strata)) + geom_step(aes(x=time, y=cumevent),
+                                                                         direction="hv") + geom_step(aes(x=time, y=upper), directions="hv", linetype=2, alpha=0.5) +
+                                                                           geom_step(aes(x=time,y=lower), direction="hv", linetype=2, alpha=0.5)
+    }
+  }
+}
+@
+
+<<'time to status adjustment-by tb burden', fig.height=6,fig.width=8,warning=FALSE,fig.cap="Status adjustment in non-immigrant applicants">>=
+#Survival frame
+t.survfit <- survfit(Surv(texamyr, status)~tbburden, data=ni.main)
+t.survfit$cumevent <- 1-t.survfit$surv
+t.survframe <- createSurvivalFrame(t.survfit)
+#colour <- c("red", "blue", "green")
+xref=data.frame(xval=c(2.5, 5))
+yref=data.frame(yval=c(0.5, 0.8))
+@
+
+<<'tb plot',fig.height=5, fig.width=8,warning=FALSE>>=
+qplot_survival(t.survframe, FALSE) + xlab("time to exam (years)") + ylab("Cumulative probability \nof adjusting status") + opts(title="Time to status adjustment \nby TB burden of country of birth") + geom_vline(aes(xintercept=xval), data=xref, color="blue", linetype="dashed") + geom_hline(aes(yintercept=yval), data=yref, color="blue", linetype="dashed") + scale_y_continuous(labels=percent) + scale_x_continuous(limits=c(0, 20), breaks=c(0, 2.5, 5, 7.5, 10, 15, 20)) + theme_bw() + scale_colour_hue(name="TB burden of country of birth",                                                                                                                                                                                                                                                                                                                 breaks=c("tbburden=high (TB incidence>=100/100,000)", "tbburden=medium (TB incidence >=20 to <100/100,000)", "tbburden=low (TB incidence<20/100,000)"),                                                                                                                                                                                                                                                                                                                 labels=c("High >=100/100,000", "Medium >=20 to <100/100,000", "Low <20/100,000"),                                                                                                                                                                                                                                                                                                                l=40) +
+  opts(legend.justification=c(1,0), legend.position=c(1,0)) 
+@
+
+\end{document}
